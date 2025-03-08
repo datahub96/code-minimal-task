@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
 import { Navigate, useLocation } from "react-router-dom";
+import { StorageManager } from "@/components/storage/StorageManager";
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -7,10 +8,11 @@ interface AuthGuardProps {
 
 const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
   const location = useLocation();
+
   // Check for authentication with error handling
   const isAuthenticated = (() => {
     try {
-      return localStorage.getItem("taskManagerUser") !== null;
+      return StorageManager.getItem("taskManagerUser") !== null;
     } catch (error) {
       console.error("Error checking authentication:", error);
       return false;

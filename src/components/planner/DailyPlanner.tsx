@@ -39,7 +39,7 @@ const DailyPlanner: React.FC<DailyPlannerProps> = ({
     const loadPlannerData = () => {
       try {
         const dateKey = format(date, "yyyy-MM-dd");
-        const savedData = localStorage.getItem(`dailyPlanner_${dateKey}`);
+        const savedData = StorageManager.getItem(`dailyPlanner_${dateKey}`);
 
         if (savedData) {
           const parsedData = JSON.parse(savedData);
@@ -96,10 +96,7 @@ const DailyPlanner: React.FC<DailyPlannerProps> = ({
         planItems,
         notes,
       };
-      localStorage.setItem(
-        `dailyPlanner_${dateKey}`,
-        JSON.stringify(dataToSave),
-      );
+      StorageManager.setJSON(`dailyPlanner_${dateKey}`, dataToSave);
 
       // Convert plan items to tasks and add them to the task list
       const tasksToAdd = planItems

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { isSameDay } from "date-fns";
+import { StorageManager } from "@/components/storage/StorageManager";
 import Header from "./layout/Header";
 import TaskList from "./tasks/TaskList";
 import CalendarView from "./tasks/CalendarView";
@@ -126,24 +127,26 @@ const Home = () => {
   useEffect(() => {
     // Get current user
     try {
-      const userJson = localStorage.getItem("taskManagerUser");
+      const userJson = StorageManager.getItem("taskManagerUser");
       if (userJson) {
         const user = JSON.parse(userJson);
         setCurrentUser(user);
 
         // Show planner on login if enabled and this is a fresh login
-        const hasShownPlanner = localStorage.getItem("plannerShownForSession");
+        const hasShownPlanner = StorageManager.getItem(
+          "plannerShownForSession",
+        );
         if (showPlannerOnLogin && !hasShownPlanner) {
           setIsPlannerOpen(true);
           // Mark that we've shown the planner for this session
-          localStorage.setItem("plannerShownForSession", "true");
+          StorageManager.setItem("plannerShownForSession", "true");
         }
       }
 
       // Load settings
-      try {
-        const savedSettings = localStorage.getItem("taskManagerSettings");
-        if (savedSettings) {
+      const savedSettings = StorageManager.getItem("taskManagerSettings");
+      if (savedSettings) {
+        try {
           const parsedSettings = JSON.parse(savedSettings);
           setUserSettings(parsedSettings);
 
@@ -166,33 +169,33 @@ const Home = () => {
           if (parsedSettings.showPlannerOnLogin !== undefined) {
             setShowPlannerOnLogin(parsedSettings.showPlannerOnLogin);
           }
-        }
-
-        // Load tasks
-        try {
-          const savedTasks = localStorage.getItem("taskManagerTasks");
-          if (savedTasks) {
-            const parsedTasks = JSON.parse(savedTasks);
-            // Convert ISO date strings back to Date objects
-            const tasksWithDates = parsedTasks.map((task: any) => ({
-              ...task,
-              deadline: task.deadline ? new Date(task.deadline) : undefined,
-            }));
-
-            // Load all tasks but only show non-completed tasks by default
-            const activeTasks = tasksWithDates.filter(
-              (task) => !task.completed,
-            );
-            setTasks(activeTasks);
-          } else {
-            setTasks([]);
-          }
         } catch (error) {
-          console.error("Error loading tasks or settings:", error);
+          console.error("Error parsing settings:", error);
+        }
+      }
+
+      // Load tasks
+      const savedTasks = StorageManager.getItem("taskManagerTasks");
+      if (savedTasks) {
+        try {
+          const parsedTasks = JSON.parse(savedTasks);
+          // Convert ISO date strings back to Date objects
+          const tasksWithDates = parsedTasks.map((task: any) => ({
+            ...task,
+            deadline: task.deadline ? new Date(task.deadline) : undefined,
+          }));
+
+          // Load all tasks but only show non-completed tasks by default
+          const activeTasks = tasksWithDates.filter((task) => !task.completed);
+          setTasks(activeTasks);
+          console.log("Loaded tasks from localStorage:", activeTasks.length);
+        } catch (error) {
+          console.error("Error parsing tasks:", error);
           setTasks([]);
         }
-      } catch (error) {
-        console.error("Error loading settings:", error);
+      } else {
+        console.log("No tasks found in localStorage");
+        setTasks([]);
       }
     } catch (error) {
       console.error("Error loading user data:", error);
@@ -323,14 +326,25 @@ const Home = () => {
         deadline: task.deadline ? task.deadline.toISOString() : undefined,
       }));
 
-      // Save to session storage
-      localStorage.setItem("taskManagerTasks", JSON.stringify(tasksForStorage));
+      // Save to localStorage using StorageManager
+      const success = StorageManager.setJSON(
+        "taskManagerTasks",
+        tasksForStorage,
+      );
 
       // Save to user-specific storage if user is logged in
       if (currentUser?.id) {
-        localStorage.setItem(
+        StorageManager.setJSON(
           `taskManagerTasks_${currentUser.id}`,
-          JSON.stringify(tasksForStorage),
+          tasksForStorage,
+        );
+      }
+
+      if (!success) {
+        console.error("Failed to save tasks to localStorage");
+      } else {
+        console.log(
+          `Successfully saved ${tasksForStorage.length} tasks to localStorage`,
         );
       }
     } catch (error) {
@@ -547,14 +561,14 @@ const Home = () => {
     console.log("Received new settings:", newSettings);
     setUserSettings(newSettings);
 
-    // Save settings to localStorage for current session
-    localStorage.setItem("taskManagerSettings", JSON.stringify(newSettings));
+    // Save settings to localStorage for current session using StorageManager
+    StorageManager.setJSON("taskManagerSettings", newSettings);
 
     // Save settings to user-specific storage if user is logged in
     if (currentUser?.id) {
-      localStorage.setItem(
+      StorageManager.setJSON(
         `taskManagerSettings_${currentUser.id}`,
-        JSON.stringify(newSettings),
+        newSettings,
       );
     }
 

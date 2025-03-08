@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { StorageManager } from "@/components/storage/StorageManager";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,15 +46,17 @@ const LoginPage = () => {
     try {
       if (username === DEMO_USER.username && password === DEMO_USER.password) {
         // Demo user login - no need for database
-        // Store user info in localStorage
+        // Store user info in localStorage using StorageManager
         try {
-          localStorage.setItem(
-            "taskManagerUser",
-            JSON.stringify({
-              id: "demo-user-id",
-              username,
-            }),
-          );
+          const userData = {
+            id: "demo-user-id",
+            username,
+          };
+          const success = StorageManager.setJSON("taskManagerUser", userData);
+
+          if (!success) {
+            throw new Error("Failed to save user data");
+          }
         } catch (error) {
           console.error("Error storing user data:", error);
           setError(
@@ -80,10 +83,7 @@ const LoginPage = () => {
           ],
         };
 
-        localStorage.setItem(
-          "taskManagerSettings",
-          JSON.stringify(defaultSettings),
-        );
+        StorageManager.setJSON("taskManagerSettings", defaultSettings);
 
         // Set default tasks for demo user
         const defaultTasks = [
@@ -112,14 +112,14 @@ const LoginPage = () => {
           },
         ];
 
-        localStorage.setItem("taskManagerTasks", JSON.stringify(defaultTasks));
-        localStorage.setItem(
+        StorageManager.setJSON("taskManagerTasks", defaultTasks);
+        StorageManager.setJSON(
           `taskManagerTasks_${"demo-user-id"}`,
-          JSON.stringify(defaultTasks),
+          defaultTasks,
         );
 
         // Clear the planner shown flag so it shows on fresh login
-        localStorage.removeItem("plannerShownForSession");
+        StorageManager.removeItem("plannerShownForSession");
 
         // Redirect to home page
         navigate("/");
@@ -135,40 +135,31 @@ const LoginPage = () => {
 
           if (user) {
             // Store user info in localStorage
-            localStorage.setItem(
-              "taskManagerUser",
-              JSON.stringify({
-                id: user.id,
-                username: user.username,
-              }),
-            );
+            StorageManager.setJSON("taskManagerUser", {
+              id: user.id,
+              username: user.username,
+            });
 
             // Load user's settings
             try {
               const userSettings = JSON.parse(
                 localStorage.getItem(`taskManagerSettings_${user.id}`) || "{}",
               );
-              localStorage.setItem(
-                "taskManagerSettings",
-                JSON.stringify(userSettings),
-              );
+              StorageManager.setJSON("taskManagerSettings", userSettings);
 
               // Load user's tasks
               const userTasks = JSON.parse(
                 localStorage.getItem(`taskManagerTasks_${user.id}`) || "[]",
               );
-              localStorage.setItem(
-                "taskManagerTasks",
-                JSON.stringify(userTasks),
-              );
+              StorageManager.setJSON("taskManagerTasks", userTasks);
             } catch (error) {
               console.error("Error loading user data:", error);
-              localStorage.setItem("taskManagerSettings", JSON.stringify({}));
-              localStorage.setItem("taskManagerTasks", JSON.stringify([]));
+              StorageManager.setJSON("taskManagerSettings", {});
+              StorageManager.setJSON("taskManagerTasks", []);
             }
 
             // Clear the planner shown flag so it shows on fresh login
-            localStorage.removeItem("plannerShownForSession");
+            StorageManager.removeItem("plannerShownForSession");
 
             // Redirect to home page
             navigate("/");
@@ -230,7 +221,7 @@ const LoginPage = () => {
 
         // Add user to users list
         users.push(newUser);
-        localStorage.setItem("taskManagerUsers", JSON.stringify(users));
+        StorageManager.setJSON("taskManagerUsers", users);
       } catch (error) {
         console.error("Error checking username:", error);
         setError("An error occurred during registration. Please try again.");
@@ -239,13 +230,10 @@ const LoginPage = () => {
       }
 
       // Store user info in localStorage for current session
-      localStorage.setItem(
-        "taskManagerUser",
-        JSON.stringify({
-          id: userId,
-          username,
-        }),
-      );
+      StorageManager.setJSON("taskManagerUser", {
+        id: userId,
+        username,
+      });
 
       // Set default settings for new user
       const defaultSettings = {
@@ -265,21 +253,15 @@ const LoginPage = () => {
       };
 
       // Save settings both for current session and user-specific storage
-      localStorage.setItem(
-        "taskManagerSettings",
-        JSON.stringify(defaultSettings),
-      );
-      localStorage.setItem(
-        `taskManagerSettings_${userId}`,
-        JSON.stringify(defaultSettings),
-      );
+      StorageManager.setJSON("taskManagerSettings", defaultSettings);
+      StorageManager.setJSON(`taskManagerSettings_${userId}`, defaultSettings);
 
       // Create empty tasks array for new user
-      localStorage.setItem("taskManagerTasks", JSON.stringify([]));
-      localStorage.setItem(`taskManagerTasks_${userId}`, JSON.stringify([]));
+      StorageManager.setJSON("taskManagerTasks", []);
+      StorageManager.setJSON(`taskManagerTasks_${userId}`, []);
 
       // Clear the planner shown flag so it shows on fresh login
-      localStorage.removeItem("plannerShownForSession");
+      StorageManager.removeItem("plannerShownForSession");
 
       // Redirect to home page
       navigate("/");

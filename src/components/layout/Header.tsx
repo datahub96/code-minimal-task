@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { StorageManager } from "@/components/storage/StorageManager";
 import { Button } from "../ui/button";
 import { Switch } from "../ui/switch";
 import {
@@ -68,7 +69,7 @@ const Header = ({
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("taskManagerUser");
+    StorageManager.removeItem("taskManagerUser");
     navigate("/login");
   };
 
@@ -76,8 +77,8 @@ const Header = ({
     if (feedbackText.trim()) {
       // Log error report to database
       const errorReport = {
-        userId: localStorage.getItem("taskManagerUser")
-          ? JSON.parse(localStorage.getItem("taskManagerUser")).id
+        userId: StorageManager.getItem("taskManagerUser")
+          ? JSON.parse(StorageManager.getItem("taskManagerUser")).id
           : "anonymous",
         timestamp: new Date().toISOString(),
         userAgent: navigator.userAgent,
@@ -87,17 +88,12 @@ const Header = ({
 
       // Save to localStorage for demo purposes (in a real app, this would be sent to a database)
       try {
-        const existingReports = JSON.parse(
-          localStorage.getItem("feedbackReports") || "[]",
-        );
+        const existingReports = StorageManager.getJSON("feedbackReports", []);
         existingReports.push(errorReport);
-        localStorage.setItem(
-          "feedbackReports",
-          JSON.stringify(existingReports),
-        );
+        StorageManager.setJSON("feedbackReports", existingReports);
       } catch (error) {
         console.error("Error saving feedback:", error);
-        localStorage.setItem("feedbackReports", JSON.stringify([errorReport]));
+        StorageManager.setJSON("feedbackReports", [errorReport]);
       }
 
       console.log("Feedback submitted:", errorReport);
