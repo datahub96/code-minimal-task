@@ -1,16 +1,25 @@
 import React, { useState } from "react";
-import { Calendar } from "@/components/ui/calendar";
+import {
+  format,
+  isSameDay,
+  addMonths,
+  subMonths,
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
+  getDay,
+  isToday,
+} from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { format, isSameDay } from "date-fns";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  Calendar as CalendarIcon,
+} from "lucide-react";
 
 interface Task {
   id: string;
@@ -32,74 +41,28 @@ interface CalendarViewProps {
 }
 
 const CalendarView: React.FC<CalendarViewProps> = ({
-  tasks = [
-    {
-      id: "1",
-      title: "Complete project proposal",
-      description: "Finish the draft and send for review",
-      deadline: new Date(2023, 5, 15),
-      category: { name: "Work", color: "bg-blue-500" },
-      completed: false,
-    },
-    {
-      id: "2",
-      title: "Grocery shopping",
-      deadline: new Date(2023, 5, 16),
-      category: { name: "Personal", color: "bg-green-500" },
-      completed: false,
-    },
-    {
-      id: "3",
-      title: "Dentist appointment",
-      deadline: new Date(2023, 5, 18),
-      category: { name: "Health", color: "bg-red-500" },
-      completed: false,
-    },
-    {
-      id: "4",
-      title: "Team meeting",
-      deadline: new Date(2023, 5, 20),
-      category: { name: "Work", color: "bg-blue-500" },
-      completed: false,
-    },
-    {
-      id: "5",
-      title: "Birthday party",
-      deadline: new Date(2023, 5, 22),
-      category: { name: "Social", color: "bg-purple-500" },
-      completed: false,
-    },
-  ],
+  tasks = [],
   onTaskClick = () => {},
   onAddTask = () => {},
   onDateChange = () => {},
 }) => {
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(
-    new Date(),
-  );
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
+  const [nextMonth, setNextMonth] = useState<Date>(addMonths(new Date(), 1));
 
-  const handleDateSelect = (date: Date | undefined) => {
-    if (date) {
-      setSelectedDate(date);
-      onDateChange(date);
-    }
+  const handleDateSelect = (date: Date) => {
+    setSelectedDate(date);
+    onDateChange(date);
   };
 
   const handlePreviousMonth = () => {
-    setCurrentMonth((prev) => {
-      const newDate = new Date(prev);
-      newDate.setMonth(newDate.getMonth() - 1);
-      return newDate;
-    });
+    setCurrentMonth(subMonths(currentMonth, 1));
+    setNextMonth(subMonths(nextMonth, 1));
   };
 
   const handleNextMonth = () => {
-    setCurrentMonth((prev) => {
-      const newDate = new Date(prev);
-      newDate.setMonth(newDate.getMonth() + 1);
-      return newDate;
-    });
+    setCurrentMonth(addMonths(currentMonth, 1));
+    setNextMonth(addMonths(nextMonth, 1));
   };
 
   // Function to get tasks for a specific date
@@ -107,145 +70,194 @@ const CalendarView: React.FC<CalendarViewProps> = ({
     return tasks.filter((task) => isSameDay(task.deadline, date));
   };
 
-  // Custom day renderer to show task indicators
-  const renderDay = (day: Date) => {
-    const dayTasks = getTasksForDate(day);
-    const hasCompletedTasks = dayTasks.some((task) => task.completed);
-    const hasIncompleteTasks = dayTasks.some((task) => !task.completed);
+  // Generate calendar days for a month
+  const generateCalendarDays = (month: Date) => {
+    const monthStart = startOfMonth(month);
+    const monthEnd = endOfMonth(month);
+    const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
+
+    // Get the day of the week for the first day (0 = Sunday, 1 = Monday, etc.)
+    const startDay = getDay(monthStart);
+
+    // Create array for the days of the week header
+    const weekDays = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+
+    // Create empty slots for days before the first day of the month
+    const blanks = Array(startDay).fill(null);
+
+    // Combine blanks and days
+    const calendarDays = [...blanks, ...days];
+
+    return { weekDays, calendarDays };
+  };
+
+  const renderMonthCalendar = (month: Date) => {
+    const { weekDays, calendarDays } = generateCalendarDays(month);
 
     return (
-      <div className="relative w-full h-full flex items-center justify-center">
-        {day.getDate()}
-        {dayTasks.length > 0 && (
-          <div className="absolute -bottom-1 flex gap-1 justify-center">
-            {hasIncompleteTasks && (
-              <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-            )}
-            {hasCompletedTasks && (
-              <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
-            )}
-          </div>
-        )}
+      <div className="flex flex-col">
+        <div className="text-base font-semibold mb-4 text-center">
+          {format(month, "MMMM yyyy")}
+        </div>
+
+        {/* Days of week header */}
+        <div className="grid grid-cols-7 mb-1">
+          {weekDays.map((day, index) => (
+            <div
+              key={index}
+              className="text-center text-xs font-medium text-gray-500 py-1"
+            >
+              {day}
+            </div>
+          ))}
+        </div>
+
+        {/* Calendar grid */}
+        <div className="grid grid-cols-7 gap-1">
+          {calendarDays.map((day, index) => {
+            if (!day) {
+              // Empty cell for days before the start of the month
+              return <div key={`empty-${index}`} className="h-10 p-1" />;
+            }
+
+            const dayTasks = getTasksForDate(day);
+            const hasCompletedTasks = dayTasks.some((task) => task.completed);
+            const hasIncompleteTasks = dayTasks.some((task) => !task.completed);
+            const isCurrentDay = isToday(day);
+            const isSelected = selectedDate && isSameDay(day, selectedDate);
+
+            return (
+              <button
+                key={day.toString()}
+                onClick={() => handleDateSelect(day)}
+                className={`h-10 p-1 relative flex flex-col items-center justify-center rounded-md transition-colors ${isCurrentDay ? "bg-primary/10 font-bold" : ""} ${isSelected ? "ring-2 ring-primary" : ""} hover:bg-gray-100 dark:hover:bg-gray-800`}
+              >
+                <span
+                  className={`text-sm ${isCurrentDay ? "text-primary" : ""}`}
+                >
+                  {format(day, "d")}
+                </span>
+
+                {/* Task indicators */}
+                {(hasIncompleteTasks || hasCompletedTasks) && (
+                  <div className="flex gap-0.5 mt-0.5">
+                    {hasIncompleteTasks && (
+                      <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                    )}
+                    {hasCompletedTasks && (
+                      <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                    )}
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
     );
   };
 
   return (
-    <div className="flex flex-col h-full bg-background rounded-md border">
-      <div className="flex items-center justify-between p-2 md:p-4 border-b">
-        <h2 className="text-lg md:text-xl font-semibold">Calendar View</h2>
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={handlePreviousMonth}
-            className="p-2 rounded-full hover:bg-muted"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </button>
-          <span className="font-medium">
-            {format(currentMonth, "MMMM yyyy")}
+    <div className="flex flex-col h-full bg-white dark:bg-gray-900 rounded-lg overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b">
+        <div className="flex items-center gap-2">
+          <CalendarIcon className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-semibold">Calendar View</h2>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handlePreviousMonth}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+
+          <span className="text-sm font-medium">
+            {format(currentMonth, "MMM yyyy")} - {format(nextMonth, "MMM yyyy")}
           </span>
-          <button
-            onClick={handleNextMonth}
-            className="p-2 rounded-full hover:bg-muted"
-          >
-            <ChevronRight className="h-5 w-5" />
-          </button>
+
+          <Button variant="outline" size="sm" onClick={handleNextMonth}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-7 flex-1 h-[calc(100%-4rem)]">
-        <div className="lg:col-span-5 p-2 md:p-4 overflow-auto">
-          <Calendar
-            mode="single"
-            selected={selectedDate}
-            onSelect={handleDateSelect}
-            month={currentMonth}
-            onMonthChange={setCurrentMonth}
-            className="w-full rounded-md border shadow-sm"
-            components={{
-              Day: ({ date, ...props }) => (
-                <div {...props} className="p-3 relative">
-                  {renderDay(date)}
-                </div>
-              ),
-              DayContent: (props) => (
-                <div className="h-10 w-10 p-0 font-normal aria-selected:opacity-100">
-                  {props.children}
-                </div>
-              ),
-            }}
-          />
+        {/* Calendar section */}
+        <div className="lg:col-span-5 p-2 md:p-4 overflow-auto border-r">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
+            {/* Current Month */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
+              {renderMonthCalendar(currentMonth)}
+            </div>
+
+            {/* Next Month */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
+              {renderMonthCalendar(nextMonth)}
+            </div>
+          </div>
         </div>
 
-        <div className="lg:col-span-2 border-l p-2 md:p-4 overflow-auto">
-          <Card className="h-full">
-            <CardHeader className="pb-2">
+        {/* Selected day tasks */}
+        <div className="lg:col-span-2 p-2 md:p-4 overflow-auto bg-gray-50 dark:bg-gray-800">
+          <Card className="border-0 shadow-none bg-transparent">
+            <CardHeader className="px-0 pt-0 pb-3 border-b">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base md:text-lg">
-                  {selectedDate
-                    ? format(selectedDate, "MMMM d, yyyy")
-                    : "Select a date"}
+                <CardTitle className="text-base font-semibold">
+                  {format(selectedDate, "MMMM d, yyyy")}
                 </CardTitle>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={() => selectedDate && onAddTask(selectedDate)}
-                        className="p-1 rounded-full hover:bg-muted"
-                      >
-                        <Plus className="h-5 w-5" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Add task for this date</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 w-8 p-0 rounded-full"
+                  onClick={() => onAddTask(selectedDate)}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
               </div>
             </CardHeader>
-            <CardContent>
-              {selectedDate ? (
-                <ScrollArea className="h-[calc(100vh-20rem)] pr-4">
-                  <div className="space-y-3">
-                    {getTasksForDate(selectedDate).length > 0 ? (
-                      getTasksForDate(selectedDate).map((task) => (
-                        <div
-                          key={task.id}
-                          onClick={() => onTaskClick(task.id)}
-                          className={`p-3 rounded-md border cursor-pointer hover:bg-muted transition-colors ${task.completed ? "opacity-60" : ""}`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <h3
-                              className={`font-medium ${task.completed ? "line-through" : ""}`}
-                            >
-                              {task.title}
-                            </h3>
-                            <Badge
-                              style={{ backgroundColor: task.category.color }}
-                              className="text-white"
-                            >
-                              {task.category.name}
-                            </Badge>
-                          </div>
-                          {task.description && (
-                            <p className="text-sm text-muted-foreground mt-1">
-                              {task.description}
-                            </p>
-                          )}
+            <CardContent className="px-0 pt-3">
+              <ScrollArea className="h-[calc(100vh-20rem)]">
+                <div className="space-y-2">
+                  {getTasksForDate(selectedDate).length > 0 ? (
+                    getTasksForDate(selectedDate).map((task) => (
+                      <div
+                        key={task.id}
+                        onClick={() => onTaskClick(task.id)}
+                        className={`p-2 md:p-3 rounded-md border-l-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${task.completed ? "opacity-60" : ""}`}
+                        style={{ borderLeftColor: task.category.color }}
+                      >
+                        <div className="flex items-center justify-between">
+                          <h3
+                            className={`text-sm font-medium ${task.completed ? "line-through" : ""}`}
+                          >
+                            {task.title}
+                          </h3>
+                          <Badge
+                            variant="outline"
+                            className="text-xs"
+                            style={{
+                              backgroundColor: `${task.category.color}20`,
+                              borderColor: task.category.color,
+                              color: task.category.color,
+                            }}
+                          >
+                            {task.category.name}
+                          </Badge>
                         </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-8 text-muted-foreground">
-                        No tasks for this date
+                        {task.description && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {task.description}
+                          </p>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </ScrollArea>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  Select a date to view tasks
+                    ))
+                  ) : (
+                    <div className="text-center py-6 text-sm text-muted-foreground">
+                      No tasks for this date
+                    </div>
+                  )}
                 </div>
-              )}
+              </ScrollArea>
             </CardContent>
           </Card>
         </div>

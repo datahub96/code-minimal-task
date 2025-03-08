@@ -42,6 +42,8 @@ interface TaskFormValues {
   deadline: Date | null;
   category: string;
   reminderTime: string;
+  timeSpent?: number;
+  expectedTime?: number;
 }
 
 // This will be replaced with categories from userSettings
@@ -84,6 +86,8 @@ const TaskForm: React.FC<ExtendedTaskFormProps> = ({
     deadline: null,
     category: "work",
     reminderTime: "0",
+    timeSpent: 0,
+    expectedTime: 3600000, // Default 1 hour
   },
   isEditing = false,
   categories = [],
@@ -105,7 +109,7 @@ const TaskForm: React.FC<ExtendedTaskFormProps> = ({
 
   return (
     <div className="w-full max-w-md p-3 md:p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-      <h2 className="text-xl md:text-2xl font-bold mb-3 md:mb-6 text-gray-800 dark:text-gray-100">
+      <h2 className="text-lg md:text-2xl font-bold mb-3 md:mb-6 text-gray-800 dark:text-gray-100">
         {isEditing ? "Edit Task" : "Add New Task"}
       </h2>
 
@@ -146,15 +150,15 @@ const TaskForm: React.FC<ExtendedTaskFormProps> = ({
             )}
           />
 
-          <div className="space-y-4">
-            <FormLabel>Deadline</FormLabel>
+          <div className="space-y-2 md:space-y-4">
+            <FormLabel className="text-sm">Deadline</FormLabel>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
-                  className="w-full justify-start text-left font-normal"
+                  className="w-full justify-start text-left font-normal text-xs md:text-sm h-9"
                 >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  <CalendarIcon className="mr-2 h-3.5 w-3.5 md:h-4 md:w-4" />
                   {date ? format(date, "PPP") : <span>Select a date</span>}
                 </Button>
               </PopoverTrigger>
@@ -248,6 +252,139 @@ const TaskForm: React.FC<ExtendedTaskFormProps> = ({
                 </Select>
                 <FormDescription>
                   When should we remind you about this task?
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Time Spent field - only show when editing an existing task */}
+          {isEditing && (
+            <FormField
+              control={form.control}
+              name="timeSpent"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Time Spent (hours:minutes:seconds)</FormLabel>
+                  <div className="flex space-x-2">
+                    <Input
+                      type="number"
+                      placeholder="Hours"
+                      className="w-1/3"
+                      value={Math.floor((field.value || 0) / (1000 * 60 * 60))}
+                      onChange={(e) => {
+                        const hours = parseInt(e.target.value) || 0;
+                        const minutes = Math.floor(
+                          ((field.value || 0) % (1000 * 60 * 60)) / (1000 * 60),
+                        );
+                        const seconds = Math.floor(
+                          ((field.value || 0) % (1000 * 60)) / 1000,
+                        );
+                        const newTimeSpent =
+                          (hours * 60 * 60 + minutes * 60 + seconds) * 1000;
+                        field.onChange(newTimeSpent);
+                      }}
+                      min="0"
+                    />
+                    <Input
+                      type="number"
+                      placeholder="Minutes"
+                      className="w-1/3"
+                      value={Math.floor(
+                        ((field.value || 0) % (1000 * 60 * 60)) / (1000 * 60),
+                      )}
+                      onChange={(e) => {
+                        const hours = Math.floor(
+                          (field.value || 0) / (1000 * 60 * 60),
+                        );
+                        const minutes = parseInt(e.target.value) || 0;
+                        const seconds = Math.floor(
+                          ((field.value || 0) % (1000 * 60)) / 1000,
+                        );
+                        const newTimeSpent =
+                          (hours * 60 * 60 + minutes * 60 + seconds) * 1000;
+                        field.onChange(newTimeSpent);
+                      }}
+                      min="0"
+                      max="59"
+                    />
+                    <Input
+                      type="number"
+                      placeholder="Seconds"
+                      className="w-1/3"
+                      value={Math.floor(
+                        ((field.value || 0) % (1000 * 60)) / 1000,
+                      )}
+                      onChange={(e) => {
+                        const hours = Math.floor(
+                          (field.value || 0) / (1000 * 60 * 60),
+                        );
+                        const minutes = Math.floor(
+                          ((field.value || 0) % (1000 * 60 * 60)) / (1000 * 60),
+                        );
+                        const seconds = parseInt(e.target.value) || 0;
+                        const newTimeSpent =
+                          (hours * 60 * 60 + minutes * 60 + seconds) * 1000;
+                        field.onChange(newTimeSpent);
+                      }}
+                      min="0"
+                      max="59"
+                    />
+                  </div>
+                  <FormDescription>
+                    Manually adjust the time spent on this task
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+
+          <FormField
+            control={form.control}
+            name="expectedTime"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Expected Time to Complete (hours:minutes)</FormLabel>
+                <div className="flex space-x-2">
+                  <Input
+                    type="number"
+                    placeholder="Hours"
+                    className="w-1/2"
+                    value={Math.floor((field.value || 0) / (1000 * 60 * 60))}
+                    onChange={(e) => {
+                      const hours = parseInt(e.target.value) || 0;
+                      const minutes = Math.floor(
+                        ((field.value || 0) % (1000 * 60 * 60)) / (1000 * 60),
+                      );
+                      const newExpectedTime =
+                        (hours * 60 * 60 + minutes * 60) * 1000;
+                      field.onChange(newExpectedTime);
+                    }}
+                    min="0"
+                  />
+                  <Input
+                    type="number"
+                    placeholder="Minutes"
+                    className="w-1/2"
+                    value={Math.floor(
+                      ((field.value || 0) % (1000 * 60 * 60)) / (1000 * 60),
+                    )}
+                    onChange={(e) => {
+                      const hours = Math.floor(
+                        (field.value || 0) / (1000 * 60 * 60),
+                      );
+                      const minutes = parseInt(e.target.value) || 0;
+                      const newExpectedTime =
+                        (hours * 60 * 60 + minutes * 60) * 1000;
+                      field.onChange(newExpectedTime);
+                    }}
+                    min="0"
+                    max="59"
+                  />
+                </div>
+                <FormDescription>
+                  Estimate how long this task will take to complete
                 </FormDescription>
                 <FormMessage />
               </FormItem>

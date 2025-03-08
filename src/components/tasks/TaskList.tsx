@@ -25,6 +25,7 @@ export interface Task {
   completed: boolean;
   timerStarted?: number;
   timeSpent?: number;
+  expectedTime?: number;
 }
 
 interface TaskListProps {
@@ -59,6 +60,7 @@ const TaskItem = ({
     completed: false,
     timerStarted: undefined,
     timeSpent: 0,
+    expectedTime: 3600000, // 1 hour
   },
   onComplete,
   onEdit,
@@ -96,7 +98,7 @@ const TaskItem = ({
   if (viewMode === "card") {
     return (
       <Card
-        className={`mb-2 p-3 bg-white dark:bg-gray-800 border-t-4 flex flex-col gap-2 group hover:shadow-md transition-all rounded-md ${isAnimating ? "opacity-0 scale-95 transform" : "opacity-100"} ${completedStyle}`}
+        className={`mb-2 p-2 md:p-3 bg-white dark:bg-gray-800 border-t-4 flex flex-col gap-1 md:gap-2 group hover:shadow-md transition-all rounded-md ${isAnimating ? "opacity-0 scale-95 transform" : "opacity-100"} ${completedStyle}`}
         style={{
           borderTopColor: task.category?.color || "#cbd5e1",
           transition: `opacity ${ANIMATION_DURATION}ms ease-out, transform ${ANIMATION_DURATION}ms ease-out`,
@@ -200,6 +202,22 @@ const TaskItem = ({
               </TooltipProvider>
             )}
 
+            {task.expectedTime > 0 && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center text-xs text-blue-500 dark:text-blue-400">
+                      <Timer className="h-3 w-3 mr-1" />
+                      Est: {formatTime(task.expectedTime)}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Expected time to complete</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+
             {task.deadline && (
               <TooltipProvider>
                 <Tooltip>
@@ -223,7 +241,7 @@ const TaskItem = ({
 
   return (
     <Card
-      className={`mb-2 p-2 md:p-4 bg-white dark:bg-gray-800 border-l-4 flex items-center gap-2 md:gap-3 group hover:shadow-md transition-all ${isAnimating ? "opacity-0 transform -translate-x-10" : "opacity-100"} ${completedStyle}`}
+      className={`mb-2 p-2 md:p-4 bg-white dark:bg-gray-800 border-l-4 flex flex-wrap md:flex-nowrap items-center gap-2 md:gap-3 group hover:shadow-md transition-all ${isAnimating ? "opacity-0 transform -translate-x-10" : "opacity-100"} ${completedStyle}`}
       style={{
         borderLeftColor: task.category?.color || "#cbd5e1",
         transition: `opacity ${ANIMATION_DURATION}ms ease-out, transform ${ANIMATION_DURATION}ms ease-out`,
@@ -241,7 +259,7 @@ const TaskItem = ({
         <DragHandleDots2Icon className="h-5 w-5" />
       </div>
 
-      <div className="flex-grow">
+      <div className="flex-grow min-w-[150px]">
         <h3
           className={cn(
             "font-medium text-xs md:text-sm",
@@ -257,11 +275,11 @@ const TaskItem = ({
         )}
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-1 md:gap-2 w-full md:w-auto order-last md:order-none mt-2 md:mt-0">
         {task.category && (
           <Badge
             variant="outline"
-            className="text-xs"
+            className="text-[10px] md:text-xs px-1.5 py-0.5 md:px-2 md:py-1"
             style={{
               backgroundColor: `${task.category.color}20`,
               borderColor: task.category.color,
@@ -275,8 +293,8 @@ const TaskItem = ({
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
-                  <Timer className="h-3 w-3 mr-1" />
+                <div className="flex items-center text-[10px] md:text-xs text-gray-500 dark:text-gray-400">
+                  <Timer className="h-3 w-3 mr-0.5 md:mr-1" />
                   {formatTime(task.timeSpent)}
                 </div>
               </TooltipTrigger>
@@ -287,12 +305,28 @@ const TaskItem = ({
           </TooltipProvider>
         )}
 
+        {task.expectedTime > 0 && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center text-[10px] md:text-xs text-blue-500 dark:text-blue-400">
+                  <Timer className="h-3 w-3 mr-0.5 md:mr-1" />
+                  Est: {formatTime(task.expectedTime)}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Expected time to complete</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+
         {task.deadline && (
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
-                  <Clock className="h-3 w-3 mr-1" />
+                <div className="flex items-center text-[10px] md:text-xs text-gray-500 dark:text-gray-400">
+                  <Clock className="h-3 w-3 mr-0.5 md:mr-1" />
                   {task.deadline.toLocaleDateString()}
                 </div>
               </TooltipTrigger>
@@ -304,7 +338,7 @@ const TaskItem = ({
         )}
       </div>
 
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 ml-auto">
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -314,12 +348,12 @@ const TaskItem = ({
                 onClick={() =>
                   onTimerToggle?.(task.timerStarted ? false : true)
                 }
-                className="h-8 w-8"
+                className="h-7 w-7 md:h-8 md:w-8 p-0"
               >
                 {task.timerStarted ? (
-                  <Pause className="h-4 w-4 text-amber-500" />
+                  <Pause className="h-3 w-3 md:h-4 md:w-4 text-amber-500" />
                 ) : (
-                  <Play className="h-4 w-4 text-green-500" />
+                  <Play className="h-3 w-3 md:h-4 md:w-4 text-green-500" />
                 )}
               </Button>
             </TooltipTrigger>
@@ -334,17 +368,17 @@ const TaskItem = ({
             variant="ghost"
             size="icon"
             onClick={onEdit}
-            className="h-8 w-8"
+            className="h-7 w-7 md:h-8 md:w-8 p-0"
           >
-            <Edit className="h-4 w-4" />
+            <Edit className="h-3 w-3 md:h-4 md:w-4" />
           </Button>
           <Button
             variant="ghost"
             size="icon"
             onClick={onDelete}
-            className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+            className="h-7 w-7 md:h-8 md:w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
           >
-            <Trash2 className="h-4 w-4" />
+            <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
           </Button>
         </div>
       </div>
@@ -451,62 +485,10 @@ const TaskList = ({
         <h2 className="text-lg md:text-xl font-semibold text-gray-800 dark:text-gray-200">
           {showCompleted ? "Completed Tasks" : "My Tasks"}
         </h2>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className={`h-8 w-8 p-0 ${viewMode === "list" ? "bg-primary text-primary-foreground" : ""}`}
-            onClick={() => onTaskReorder && onTaskReorder(-1, -2)} // Using this as a signal to toggle view
-            title="List View"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="8" y1="6" x2="21" y2="6"></line>
-              <line x1="8" y1="12" x2="21" y2="12"></line>
-              <line x1="8" y1="18" x2="21" y2="18"></line>
-              <line x1="3" y1="6" x2="3.01" y2="6"></line>
-              <line x1="3" y1="12" x2="3.01" y2="12"></line>
-              <line x1="3" y1="18" x2="3.01" y2="18"></line>
-            </svg>
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className={`h-8 w-8 p-0 ${viewMode === "card" ? "bg-primary text-primary-foreground" : ""}`}
-            onClick={() => onTaskReorder && onTaskReorder(-2, -1)} // Using this as a signal to toggle view
-            title="Card View"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <rect width="7" height="7" x="3" y="3" rx="1" />
-              <rect width="7" height="7" x="14" y="3" rx="1" />
-              <rect width="7" height="7" x="14" y="14" rx="1" />
-              <rect width="7" height="7" x="3" y="14" rx="1" />
-            </svg>
-          </Button>
-        </div>
       </div>
 
       {viewMode === "card" ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-4">
           {visibleTasks.length === 0 ? (
             <div className="col-span-full text-center py-8 text-gray-500 dark:text-gray-400">
               {showCompleted

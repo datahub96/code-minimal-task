@@ -6,8 +6,10 @@ import CalendarView from "./tasks/CalendarView";
 import FilterBar from "./filters/FilterBar";
 import TaskForm from "./tasks/TaskForm";
 import SettingsPanel from "./settings/SettingsPanel";
+import AnalyticsPage from "./analytics/AnalyticsPage";
+import DailyPlanner from "./planner/DailyPlanner";
 import { Button } from "./ui/button";
-import { Plus } from "lucide-react";
+import { Plus, BarChart2, Calendar, List } from "lucide-react";
 import { Dialog, DialogContent, DialogTrigger } from "./ui/dialog";
 import {
   AlertDialog,
@@ -33,6 +35,7 @@ interface Task {
   completed: boolean;
   timerStarted?: number; // timestamp when timer was started
   timeSpent?: number; // time spent in milliseconds
+  expectedTime?: number; // expected time to complete in milliseconds
 }
 
 // Sample tasks data
@@ -79,15 +82,17 @@ const sampleTasks: Task[] = [
 const Home = () => {
   // State management
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [currentView, setCurrentView] = useState<"list" | "calendar" | "card">(
-    "list",
-  );
+  const [currentView, setCurrentView] = useState<
+    "list" | "calendar" | "card" | "analytics"
+  >("card");
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isTaskFormOpen, setIsTaskFormOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isPlannerOpen, setIsPlannerOpen] = useState(false);
+  const [showPlannerOnLogin, setShowPlannerOnLogin] = useState(true);
   const [userSettings, setUserSettings] = useState({
     darkMode: false,
-    defaultView: "list",
+    defaultView: "card",
     notificationsEnabled: true,
     notificationTime: "30",
     categories: [
@@ -101,6 +106,10 @@ const Home = () => {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
   const [filters, setFilters] = useState({});
+  const [currentUser, setCurrentUser] = useState<{
+    id: string;
+    username: string;
+  } | null>(null);
 
   // Check system preference for dark mode on initial load
   useEffect(() => {
@@ -115,6 +124,21 @@ const Home = () => {
 
   // Load user settings and tasks from localStorage when component mounts
   useEffect(() => {
+    // Get current user
+    const userJson = localStorage.getItem("taskManagerUser");
+    if (userJson) {
+      const user = JSON.parse(userJson);
+      setCurrentUser(user);
+
+      // Show planner on login if enabled and this is a fresh login
+      const hasShownPlanner = localStorage.getItem("plannerShownForSession");
+      if (showPlannerOnLogin && !hasShownPlanner) {
+        setIsPlannerOpen(true);
+        // Mark that we've shown the planner for this session
+        localStorage.setItem("plannerShownForSession", "true");
+      }
+    }
+
     // Load settings
     const savedSettings = localStorage.getItem("taskManagerSettings");
     if (savedSettings) {
@@ -135,6 +159,11 @@ const Home = () => {
       if (parsedSettings.defaultView) {
         setCurrentView(parsedSettings.defaultView);
       }
+
+      // Apply saved planner setting
+      if (parsedSettings.showPlannerOnLogin !== undefined) {
+        setShowPlannerOnLogin(parsedSettings.showPlannerOnLogin);
+      }
     }
 
     // Load tasks
@@ -147,18 +176,23 @@ const Home = () => {
           ...task,
           deadline: task.deadline ? new Date(task.deadline) : undefined,
         }));
-        setTasks(tasksWithDates);
+
+        // Load all tasks but only show non-completed tasks by default
+        const activeTasks = tasksWithDates.filter((task) => !task.completed);
+        setTasks(activeTasks);
       } catch (error) {
         console.error("Error parsing saved tasks:", error);
-        setTasks(sampleTasks);
+        setTasks([]);
       }
     } else {
-      setTasks(sampleTasks);
+      setTasks([]);
     }
   }, []);
 
   // Handle view toggle
-  const handleViewChange = (view: "list" | "calendar" | "card") => {
+  const handleViewChange = (
+    view: "list" | "calendar" | "card" | "analytics",
+  ) => {
     setCurrentView(view);
   };
 
@@ -175,9 +209,41 @@ const Home = () => {
     }
   };
 
+  // Format time spent in a readable format (HH:MM:SS)
+  const formatTimeSpent = (ms: number) => {
+    const seconds = Math.floor(ms / 1000) % 60;
+    const minutes = Math.floor(ms / (1000 * 60)) % 60;
+    const hours = Math.floor(ms / (1000 * 60 * 60));
+
+    if (hours === 0) {
+      return `${minutes}m ${seconds}s`;
+    }
+    return `${hours}h ${minutes}m`;
+  };
+
   // Task operations
-  const handleTaskComplete = (taskId: string) => {
-    const updatedTasks = tasks.map((task) => {
+  const handleTaskComplete = async (taskId: string) => {
+    // Get all tasks from localStorage to ensure we have the complete set
+    const savedTasks = localStorage.getItem("taskManagerTasks");
+    let allTasks = [];
+
+    if (savedTasks) {
+      try {
+        const parsedTasks = JSON.parse(savedTasks);
+        allTasks = parsedTasks.map((task: any) => ({
+          ...task,
+          deadline: task.deadline ? new Date(task.deadline) : undefined,
+        }));
+      } catch (error) {
+        console.error("Error parsing saved tasks:", error);
+        allTasks = [...tasks]; // Fallback to current state
+      }
+    } else {
+      allTasks = [...tasks]; // Fallback to current state
+    }
+
+    // Update the task completion status
+    const updatedTasks = allTasks.map((task) => {
       if (task.id === taskId) {
         // If completing a task with a running timer, stop the timer and calculate final time
         let finalTimeSpent = task.timeSpent || 0;
@@ -191,19 +257,26 @@ const Home = () => {
           completed: !task.completed,
           timerStarted: undefined, // Stop the timer when completing
           timeSpent: finalTimeSpent,
+          completedAt: !task.completed ? new Date().toISOString() : undefined,
         };
       }
       return task;
     });
 
-    setTasks(updatedTasks);
-
-    // Save to localStorage
+    // Save all tasks to localStorage
     saveTasksToLocalStorage(updatedTasks);
+
+    // Apply current filters to the updated tasks
+    if (Object.keys(filters).length > 0) {
+      handleFilterChange(filters);
+    } else {
+      // If no filters, show only non-completed tasks by default
+      setTasks(updatedTasks.filter((task) => !task.completed));
+    }
   };
 
   // Handle timer toggle
-  const handleTimerToggle = (taskId: string, isRunning: boolean) => {
+  const handleTimerToggle = async (taskId: string, isRunning: boolean) => {
     const now = Date.now();
     const updatedTasks = tasks.map((task) => {
       if (task.id === taskId) {
@@ -238,7 +311,17 @@ const Home = () => {
       ...task,
       deadline: task.deadline ? task.deadline.toISOString() : undefined,
     }));
+
+    // Save to session storage
     localStorage.setItem("taskManagerTasks", JSON.stringify(tasksForStorage));
+
+    // Save to user-specific storage if user is logged in
+    if (currentUser?.id) {
+      localStorage.setItem(
+        `taskManagerTasks_${currentUser.id}`,
+        JSON.stringify(tasksForStorage),
+      );
+    }
   };
 
   const handleTaskEdit = (taskId: string) => {
@@ -253,7 +336,7 @@ const Home = () => {
     setDeleteTaskId(taskId);
   };
 
-  const confirmTaskDelete = () => {
+  const confirmTaskDelete = async () => {
     if (deleteTaskId) {
       const updatedTasks = tasks.filter((task) => task.id !== deleteTaskId);
       setTasks(updatedTasks);
@@ -280,32 +363,34 @@ const Home = () => {
     saveTasksToLocalStorage(reorderedTasks);
   };
 
-  const handleTaskFormSubmit = (data: any) => {
+  const handleTaskFormSubmit = async (data: any) => {
     let updatedTasks;
 
     if (editingTask) {
       // Update existing task
-      updatedTasks = tasks.map((task) =>
-        task.id === editingTask.id
+      const updatedTask = {
+        title: data.title,
+        description: data.description,
+        deadline: data.deadline,
+        category: data.category
           ? {
-              ...task,
-              title: data.title,
-              description: data.description,
-              deadline: data.deadline,
-              category: data.category
-                ? {
-                    name: data.category,
-                    color: getCategoryColor(data.category),
-                  }
-                : undefined,
+              name: data.category,
+              color: getCategoryColor(data.category),
             }
-          : task,
+          : undefined,
+        timeSpent: data.timeSpent,
+        expectedTime: data.expectedTime,
+      };
+
+      updatedTasks = tasks.map((task) =>
+        task.id === editingTask.id ? { ...task, ...updatedTask } : task,
       );
+
       setEditingTask(null);
     } else {
       // Add new task
       const newTask: Task = {
-        id: Date.now().toString(),
+        id: Date.now().toString(), // Generate a unique ID
         title: data.title,
         description: data.description,
         deadline: data.deadline,
@@ -316,7 +401,10 @@ const Home = () => {
             }
           : undefined,
         completed: false,
+        createdAt: new Date().toISOString(),
+        expectedTime: data.expectedTime || 3600000, // Default 1 hour if not specified
       };
+
       updatedTasks = [...tasks, newTask];
     }
 
@@ -352,13 +440,13 @@ const Home = () => {
         }));
       } catch (error) {
         console.error("Error parsing saved tasks:", error);
-        originalTasks = sampleTasks;
+        originalTasks = [];
       }
     } else {
-      originalTasks = sampleTasks;
+      originalTasks = [];
     }
 
-    // If no filters are applied, show all tasks
+    // If no filters are applied, show only non-completed tasks by default
     if (
       Object.keys(newFilters).length === 0 ||
       (!newFilters.category &&
@@ -366,7 +454,7 @@ const Home = () => {
         !newFilters.dateRange &&
         !newFilters.searchTerm)
     ) {
-      setTasks(originalTasks);
+      setTasks(originalTasks.filter((task) => !task.completed));
       return;
     }
 
@@ -399,8 +487,16 @@ const Home = () => {
         filteredTasks = filteredTasks.filter(
           (task) => !task.completed && task.deadline && task.deadline < now,
         );
+      } else if (newFilters.status === "All") {
+        // For "All" status, show all tasks
+        // No filtering needed
       }
-      // 'All' status shows all tasks
+    } else if (
+      newFilters.status !== "All" &&
+      newFilters.status !== "Completed"
+    ) {
+      // By default, show only active tasks if not explicitly showing all or completed
+      filteredTasks = filteredTasks.filter((task) => !task.completed);
     }
 
     // Filter by date
@@ -432,6 +528,56 @@ const Home = () => {
     // In a real app, this would pre-fill the date in the form
   };
 
+  // Handle saving settings
+  const handleSettingsChange = (newSettings: any) => {
+    console.log("Received new settings:", newSettings);
+    setUserSettings(newSettings);
+
+    // Save settings to localStorage for current session
+    localStorage.setItem("taskManagerSettings", JSON.stringify(newSettings));
+
+    // Save settings to user-specific storage if user is logged in
+    if (currentUser?.id) {
+      localStorage.setItem(
+        `taskManagerSettings_${currentUser.id}`,
+        JSON.stringify(newSettings),
+      );
+    }
+
+    // Apply dark mode setting
+    if (newSettings.darkMode !== isDarkMode) {
+      setIsDarkMode(newSettings.darkMode);
+      if (newSettings.darkMode) {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
+    }
+
+    // Apply default view setting
+    if (newSettings.defaultView !== currentView) {
+      setCurrentView(
+        newSettings.defaultView as "list" | "calendar" | "card" | "analytics",
+      );
+    }
+
+    // Apply planner setting
+    if (newSettings.showPlannerOnLogin !== showPlannerOnLogin) {
+      setShowPlannerOnLogin(newSettings.showPlannerOnLogin);
+    }
+  };
+
+  // Determine if we should show completed tasks based on URL parameters or filters
+  const urlParams = new URLSearchParams(window.location.search);
+  const showCompleted = urlParams.get("status") === "Completed";
+
+  // Handle adding tasks from daily planner
+  const handleAddTasksFromPlanner = (tasksToAdd: any[]) => {
+    const updatedTasks = [...tasks, ...tasksToAdd];
+    setTasks(updatedTasks);
+    saveTasksToLocalStorage(updatedTasks);
+  };
+
   return (
     <div className="flex flex-col h-screen bg-background">
       {/* Header */}
@@ -441,55 +587,160 @@ const Home = () => {
         isDarkMode={isDarkMode}
         currentView={currentView}
         onSettingsClick={() => setIsSettingsOpen(true)}
+        onPlannerClick={() => setIsPlannerOpen(true)}
       />
 
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Filter bar */}
-        <FilterBar
-          onFilterChange={handleFilterChange}
-          categories={userSettings.categories}
-        />
+        {/* Time summary bar with view toggle - always visible */}
+        <div className="bg-background border-b flex items-center justify-between overflow-x-auto">
+          {currentView !== "analytics" && (
+            <div className="flex items-center">
+              <div className="flex items-center border-r px-2 md:px-3 py-1.5">
+                <div className="h-5 w-5 md:h-6 md:w-6 rounded-full bg-blue-100 dark:bg-blue-800 flex items-center justify-center mr-1 md:mr-2 flex-shrink-0">
+                  <span className="text-blue-600 dark:text-blue-300 text-[8px] md:text-[10px] font-semibold">
+                    T
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs md:text-sm font-medium text-blue-600 dark:text-blue-300 whitespace-nowrap">
+                    {formatTimeSpent(
+                      tasks
+                        .filter(
+                          (task) =>
+                            task.deadline &&
+                            new Date(task.deadline).toDateString() ===
+                              new Date().toDateString() &&
+                            !task.completed,
+                        )
+                        .reduce(
+                          (total, task) => total + (task.expectedTime || 0),
+                          0,
+                        ),
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center px-2 md:px-3 py-1.5">
+                <div className="h-5 w-5 md:h-6 md:w-6 rounded-full bg-purple-100 dark:bg-purple-800 flex items-center justify-center mr-1 md:mr-2 flex-shrink-0">
+                  <span className="text-purple-600 dark:text-purple-300 text-[8px] md:text-[10px] font-semibold">
+                    ALL
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs md:text-sm font-medium text-purple-600 dark:text-purple-300 whitespace-nowrap">
+                    {formatTimeSpent(
+                      tasks
+                        .filter((task) => !task.completed)
+                        .reduce(
+                          (total, task) => total + (task.expectedTime || 0),
+                          0,
+                        ),
+                    )}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+          {currentView === "analytics" && <div className="flex-1"></div>}
+
+          {/* View toggle - always visible */}
+          <div className="flex items-center space-x-1 md:space-x-3 border rounded-md p-1.5 mr-2">
+            <Button
+              variant={currentView === "calendar" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setCurrentView("calendar")}
+              className="px-2 md:px-4 h-9"
+            >
+              <Calendar className="h-4 w-4 md:h-5 md:w-5 mr-1 md:mr-2" />
+              <span className="text-xs md:text-base hidden sm:inline">
+                Calendar
+              </span>
+            </Button>
+
+            <Button
+              variant={currentView === "card" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setCurrentView("card")}
+              className="px-2 md:px-4 h-9"
+            >
+              <List className="h-4 w-4 md:h-5 md:w-5 mr-1 md:mr-2" />
+              <span className="text-xs md:text-base hidden sm:inline">
+                Tasks
+              </span>
+            </Button>
+
+            <Button
+              variant={currentView === "analytics" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setCurrentView("analytics")}
+              className="px-2 md:px-4 h-9"
+            >
+              <BarChart2 className="h-4 w-4 md:h-5 md:w-5 mr-1 md:mr-2" />
+              <span className="text-xs md:text-base hidden sm:inline">
+                Analytics
+              </span>
+            </Button>
+          </div>
+        </div>
+
+        {/* Filter bar - only show for task views, not analytics */}
+        {currentView !== "analytics" && (
+          <FilterBar
+            onFilterChange={handleFilterChange}
+            categories={userSettings.categories}
+          />
+        )}
 
         {/* Task management area */}
         <div className="flex-1 flex flex-col p-2 md:p-4 overflow-hidden relative">
-          {/* Add task button - fixed position */}
-          <div className="absolute bottom-6 right-6 z-10">
-            <Dialog open={isTaskFormOpen} onOpenChange={setIsTaskFormOpen}>
-              <DialogTrigger asChild>
-                <Button
-                  size="lg"
-                  className="rounded-full h-12 w-12 md:h-14 md:w-14 shadow-lg bg-primary hover:bg-primary/90 text-white flex items-center justify-center"
-                >
-                  <span className="text-2xl font-bold">+</span>
-                  <span className="sr-only">Add Task</span>
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[500px]">
-                <TaskForm
-                  onSubmit={handleTaskFormSubmit}
-                  onCancel={() => setIsTaskFormOpen(false)}
-                  initialData={
-                    editingTask
-                      ? {
-                          title: editingTask.title,
-                          description: editingTask.description || "",
-                          deadline: editingTask.deadline || null,
-                          category: editingTask.category?.name || "work",
-                          reminderTime: "0",
-                        }
-                      : undefined
-                  }
-                  isEditing={!!editingTask}
-                  categories={userSettings.categories}
-                />
-              </DialogContent>
-            </Dialog>
-          </div>
+          {/* Add task button - fixed position, only show for task views */}
+          {currentView !== "analytics" && (
+            <div className="absolute bottom-6 right-6 z-10">
+              <Dialog open={isTaskFormOpen} onOpenChange={setIsTaskFormOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    size="icon"
+                    className="rounded-full h-14 w-14 md:h-16 md:w-16 shadow-lg bg-primary hover:bg-primary/90 text-white flex items-center justify-center p-0 aspect-square"
+                    onClick={() => setEditingTask(null)}
+                  >
+                    <span className="text-3xl font-bold flex items-center justify-center h-full w-full">
+                      +
+                    </span>
+                    <span className="sr-only">Add Task</span>
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[500px]">
+                  <TaskForm
+                    onSubmit={handleTaskFormSubmit}
+                    onCancel={() => setIsTaskFormOpen(false)}
+                    initialData={
+                      editingTask
+                        ? {
+                            title: editingTask.title,
+                            description: editingTask.description || "",
+                            deadline: editingTask.deadline || null,
+                            category: editingTask.category?.name || "work",
+                            reminderTime: "0",
+                            timeSpent: editingTask.timeSpent || 0,
+                            expectedTime: editingTask.expectedTime || 3600000,
+                          }
+                        : undefined
+                    }
+                    isEditing={!!editingTask}
+                    categories={userSettings.categories}
+                  />
+                </DialogContent>
+              </Dialog>
+            </div>
+          )}
 
           {/* Task views */}
           <div className="flex-1 overflow-hidden">
-            {currentView === "list" ? (
+            {currentView === "analytics" ? (
+              <AnalyticsPage userId={currentUser?.id} />
+            ) : currentView === "list" ? (
               <TaskList
                 tasks={tasks}
                 onTaskComplete={handleTaskComplete}
@@ -534,35 +785,17 @@ const Home = () => {
             isOpen={isSettingsOpen}
             onClose={() => setIsSettingsOpen(false)}
             settings={userSettings}
-            onSettingsChange={(newSettings) => {
-              console.log("Received new settings:", newSettings);
-              setUserSettings(newSettings);
+            onSettingsChange={handleSettingsChange}
+          />
+        </DialogContent>
+      </Dialog>
 
-              // Save settings to localStorage
-              localStorage.setItem(
-                "taskManagerSettings",
-                JSON.stringify(newSettings),
-              );
-
-              // Apply dark mode setting
-              if (newSettings.darkMode !== isDarkMode) {
-                setIsDarkMode(newSettings.darkMode);
-                if (newSettings.darkMode) {
-                  document.documentElement.classList.add("dark");
-                } else {
-                  document.documentElement.classList.remove("dark");
-                }
-              }
-
-              // Apply default view setting
-              if (newSettings.defaultView !== currentView) {
-                setCurrentView(
-                  newSettings.defaultView as "list" | "calendar" | "card",
-                );
-              }
-
-              // Don't close the dialog automatically - let the user close it with the save button
-            }}
+      {/* Daily Planner dialog */}
+      <Dialog open={isPlannerOpen} onOpenChange={setIsPlannerOpen}>
+        <DialogContent className="sm:max-w-[900px]">
+          <DailyPlanner
+            onClose={() => setIsPlannerOpen(false)}
+            onAddTasks={handleAddTasksFromPlanner}
           />
         </DialogContent>
       </Dialog>

@@ -59,13 +59,11 @@ const FilterBar = ({
     searchTerm: "",
   });
 
-  const [activeFilters, setActiveFilters] = useState<string[]>([
-    "status:Pending",
-  ]);
+  const [activeFilters, setActiveFilters] = useState<string[]>([]);
 
   // Use the categories passed from props
 
-  const statuses = ["All", "Pending", "Completed", "Overdue"];
+  const statuses = ["Pending", "Completed", "All", "Overdue"];
 
   // Add a special class to the Completed status to make it more visible
   const getStatusClass = (status: string) => {
@@ -90,10 +88,10 @@ const FilterBar = ({
     const url = new URL(window.location.href);
     if (value === "Completed") {
       url.searchParams.set("status", "Completed");
-    } else if (value === "Pending") {
-      url.searchParams.set("status", "Pending");
-    } else {
+    } else if (value === "All") {
       url.searchParams.delete("status");
+    } else {
+      url.searchParams.set("status", value);
     }
     window.history.pushState({}, "", url);
   };
@@ -183,12 +181,12 @@ const FilterBar = ({
         )}
       </div>
 
-      <div className="flex flex-wrap gap-2 items-center">
+      <div className="flex flex-wrap gap-1 md:gap-2 items-center">
         {/* Category filter */}
         <Select value={filters.category} onValueChange={handleCategoryChange}>
-          <SelectTrigger className="w-[100px] md:w-[130px] h-7 md:h-8">
-            <div className="flex items-center gap-2">
-              <Tag className="h-4 w-4" />
+          <SelectTrigger className="w-[90px] md:w-[130px] h-7 md:h-8 text-xs md:text-sm">
+            <div className="flex items-center gap-1 md:gap-2">
+              <Tag className="h-3 w-3 md:h-4 md:w-4" />
               <SelectValue placeholder="Category" />
             </div>
           </SelectTrigger>
@@ -209,9 +207,9 @@ const FilterBar = ({
 
         {/* Status filter */}
         <Select value={filters.status} onValueChange={handleStatusChange}>
-          <SelectTrigger className="w-[100px] md:w-[130px] h-7 md:h-8">
-            <div className="flex items-center gap-2">
-              <CheckSquare className="h-4 w-4" />
+          <SelectTrigger className="w-[90px] md:w-[130px] h-7 md:h-8 text-xs md:text-sm">
+            <div className="flex items-center gap-1 md:gap-2">
+              <CheckSquare className="h-3 w-3 md:h-4 md:w-4" />
               <SelectValue placeholder="Status" />
             </div>
           </SelectTrigger>
@@ -224,27 +222,7 @@ const FilterBar = ({
           </SelectContent>
         </Select>
 
-        {/* Date filter */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 md:h-8 gap-1 md:gap-2 text-xs md:text-sm"
-            >
-              <CalendarIcon className="h-4 w-4" />
-              <span>Date</span>
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar
-              mode="single"
-              selected={filters.dateRange}
-              onSelect={handleDateChange}
-              initialFocus
-            />
-          </PopoverContent>
-        </Popover>
+        {/* Date filter removed as users can access date filtering through calendar view */}
 
         {/* Search input */}
         <div className="flex-grow">
@@ -278,16 +256,16 @@ const FilterBar = ({
               <Badge
                 key={filter}
                 variant={badgeVariant}
-                className="flex items-center gap-1 py-1"
+                className="flex items-center gap-1 py-0.5 px-1.5 md:py-1 md:px-2 text-[10px] md:text-xs"
               >
-                <span className="text-xs">
+                <span className="truncate max-w-[100px] md:max-w-none">
                   {type === "category" && "Category:"}
                   {type === "status" && "Status:"}
                   {type === "date" && "Date:"}
                   {type === "search" && "Search:"} {value}
                 </span>
                 <X
-                  className="h-3 w-3 cursor-pointer"
+                  className="h-3 w-3 cursor-pointer flex-shrink-0"
                   onClick={() => removeFilter(filter)}
                 />
               </Badge>

@@ -30,6 +30,7 @@ interface SettingsPanelProps {
     defaultView: string;
     notificationsEnabled: boolean;
     notificationTime: string;
+    showPlannerOnLogin?: boolean;
     categories: Array<{
       id: string;
       name: string;
@@ -44,14 +45,16 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   onClose = () => {},
   settings = {
     darkMode: false,
-    defaultView: "list",
+    defaultView: "card",
     notificationsEnabled: true,
     notificationTime: "30",
+    showPlannerOnLogin: true,
     categories: [
       { id: "1", name: "Work", color: "#4f46e5" },
       { id: "2", name: "Personal", color: "#10b981" },
       { id: "3", name: "Urgent", color: "#ef4444" },
       { id: "4", name: "Learning", color: "#f59e0b" },
+      { id: "5", name: "Daily Plan", color: "#8b5cf6" },
     ],
   },
   onSettingsChange = () => {},
@@ -64,6 +67,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [notificationTime, setNotificationTime] = useState(
     settings.notificationTime,
   );
+  const [showPlannerOnLogin, setShowPlannerOnLogin] = useState(
+    settings.showPlannerOnLogin ?? true,
+  );
   const [categories, setCategories] = useState(settings.categories);
 
   const [newCategory, setNewCategory] = useState({
@@ -71,26 +77,29 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     color: "#4f46e5",
   });
 
-  const handleAddCategory = () => {
+  const handleAddCategory = async () => {
     if (newCategory.name.trim()) {
+      const categoryId = Date.now().toString();
       const updatedCategories = [
         ...categories,
         {
-          id: Date.now().toString(),
+          id: categoryId,
           name: newCategory.name,
           color: newCategory.color,
         },
       ];
+
       setCategories(updatedCategories);
       setNewCategory({ name: "", color: "#4f46e5" });
       saveSettings({ categories: updatedCategories });
     }
   };
 
-  const handleDeleteCategory = (id: string) => {
+  const handleDeleteCategory = async (id: string) => {
     const updatedCategories = categories.filter(
       (category) => category.id !== id,
     );
+
     setCategories(updatedCategories);
     saveSettings({ categories: updatedCategories });
   };
@@ -116,12 +125,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     saveSettings({ notificationTime: value });
   };
 
-  const saveSettings = (changedSettings: any) => {
+  const saveSettings = async (changedSettings: any) => {
     const newSettings = {
       darkMode,
       defaultView,
       notificationsEnabled,
       notificationTime,
+      showPlannerOnLogin,
       categories,
       ...changedSettings,
     };
@@ -139,17 +149,37 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         <CardTitle className="text-lg md:text-xl font-semibold">
           Settings
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-xs md:text-sm">
           Customize your task management experience
         </CardDescription>
       </CardHeader>
 
       <Tabs defaultValue="appearance" className="w-full">
-        <TabsList className="grid grid-cols-4 w-full">
-          <TabsTrigger value="appearance">Appearance</TabsTrigger>
-          <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
-          <TabsTrigger value="categories">Categories</TabsTrigger>
+        <TabsList className="grid grid-cols-4 w-full overflow-x-auto">
+          <TabsTrigger
+            value="appearance"
+            className="text-xs md:text-sm px-1 md:px-4"
+          >
+            Appearance
+          </TabsTrigger>
+          <TabsTrigger
+            value="general"
+            className="text-xs md:text-sm px-1 md:px-4"
+          >
+            General
+          </TabsTrigger>
+          <TabsTrigger
+            value="notifications"
+            className="text-xs md:text-sm px-1 md:px-4"
+          >
+            Notifications
+          </TabsTrigger>
+          <TabsTrigger
+            value="categories"
+            className="text-xs md:text-sm px-1 md:px-4"
+          >
+            Categories
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="general" className="p-2 md:p-4">
@@ -174,6 +204,27 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </Select>
             </div>
 
+            <div className="space-y-0.5 mt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="show-planner">
+                    Show Daily Planner on Login
+                  </Label>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Open the daily planner automatically when you log in
+                  </p>
+                </div>
+                <Switch
+                  id="show-planner"
+                  checked={showPlannerOnLogin}
+                  onCheckedChange={(checked) => {
+                    setShowPlannerOnLogin(checked);
+                    saveSettings({ showPlannerOnLogin: checked });
+                  }}
+                />
+              </div>
+            </div>
+
             <Separator />
 
             <div className="pt-2">
@@ -185,6 +236,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     defaultView,
                     notificationsEnabled,
                     notificationTime,
+                    showPlannerOnLogin,
                     categories,
                   };
                   console.log("Saving all settings:", updatedSettings);
@@ -229,6 +281,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     defaultView,
                     notificationsEnabled,
                     notificationTime,
+                    showPlannerOnLogin,
                     categories,
                   };
                   console.log("Saving all settings:", updatedSettings);
@@ -292,6 +345,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     defaultView,
                     notificationsEnabled,
                     notificationTime,
+                    showPlannerOnLogin,
                     categories,
                   };
                   console.log("Saving all settings:", updatedSettings);
@@ -387,6 +441,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     defaultView,
                     notificationsEnabled,
                     notificationTime,
+                    showPlannerOnLogin,
                     categories,
                   };
                   console.log("Saving all settings:", updatedSettings);

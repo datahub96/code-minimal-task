@@ -18,6 +18,7 @@ interface TaskItemProps {
   completed: boolean;
   timerStarted?: number;
   timeSpent?: number;
+  expectedTime?: number;
   onComplete?: () => void;
   onTimerToggle?: (id: string, isRunning: boolean) => void;
 }
@@ -30,6 +31,7 @@ const TaskItem: React.FC<TaskItemProps> = ({
   completed,
   timerStarted,
   timeSpent = 0,
+  expectedTime = 3600000, // Default 1 hour
   onComplete = () => {},
   onTimerToggle = () => {},
 }) => {
@@ -66,17 +68,19 @@ const TaskItem: React.FC<TaskItemProps> = ({
     onTimerToggle(id, newIsRunning);
   };
   return (
-    <div className="flex flex-col p-4 bg-background border rounded-md">
-      <div className="flex items-start gap-3">
+    <div className="flex flex-col p-3 md:p-4 bg-background border rounded-md">
+      <div className="flex items-start gap-2 md:gap-3">
         <Checkbox
           checked={completed}
           onCheckedChange={onComplete}
           className="mt-1"
         />
-        <div className="flex-1">
-          <h3 className="font-medium text-base">{title}</h3>
+        <div className="flex-1 min-w-0">
+          <h3 className="font-medium text-sm md:text-base truncate">{title}</h3>
           {description && (
-            <p className="text-muted-foreground text-sm mt-1">{description}</p>
+            <p className="text-muted-foreground text-xs md:text-sm mt-1 line-clamp-2">
+              {description}
+            </p>
           )}
         </div>
 
@@ -86,14 +90,14 @@ const TaskItem: React.FC<TaskItemProps> = ({
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-8 w-8 p-0"
+                className="h-7 w-7 md:h-8 md:w-8 p-0 flex-shrink-0"
                 onClick={handleTimerToggle}
                 disabled={completed}
               >
                 {isTimerRunning ? (
-                  <Pause className="h-4 w-4 text-amber-500" />
+                  <Pause className="h-3 w-3 md:h-4 md:w-4 text-amber-500" />
                 ) : (
-                  <Play className="h-4 w-4 text-green-500" />
+                  <Play className="h-3 w-3 md:h-4 md:w-4 text-green-500" />
                 )}
               </Button>
             </TooltipTrigger>
@@ -104,19 +108,28 @@ const TaskItem: React.FC<TaskItemProps> = ({
         </TooltipProvider>
       </div>
 
-      <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2 ml-7">
+      <div className="flex flex-wrap items-center gap-2 md:gap-4 text-[10px] md:text-xs text-muted-foreground mt-2 ml-7">
         {(currentTimeSpent > 0 || isTimerRunning) && (
           <div className="flex items-center">
-            <Timer className="h-3 w-3 mr-1" />
+            <Timer className="h-3 w-3 mr-0.5 md:mr-1" />
             <span className={isTimerRunning ? "text-green-500" : ""}>
               {formatTimeSpent(currentTimeSpent)}
             </span>
           </div>
         )}
 
+        {expectedTime > 0 && (
+          <div className="flex items-center">
+            <Timer className="h-3 w-3 mr-0.5 md:mr-1 text-blue-500" />
+            <span className="text-blue-500">
+              Est: {formatTimeSpent(expectedTime)}
+            </span>
+          </div>
+        )}
+
         {deadline && (
           <div className="flex items-center">
-            <Clock className="h-3 w-3 mr-1" />
+            <Clock className="h-3 w-3 mr-0.5 md:mr-1" />
             {format(deadline, "M/d/yyyy")}
           </div>
         )}
