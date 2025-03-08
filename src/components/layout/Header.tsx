@@ -20,6 +20,7 @@ import {
   ClipboardList,
   CheckSquare,
   Send,
+  AlertTriangle,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -36,6 +37,7 @@ import {
 } from "../ui/dialog";
 import { Textarea } from "../ui/textarea";
 import { Label } from "../ui/label";
+import ErrorLogViewer from "../ErrorLogViewer";
 
 interface HeaderProps {
   onViewChange?: (view: "list" | "calendar" | "card" | "analytics") => void;
@@ -58,6 +60,7 @@ const Header = ({
     currentView,
   );
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+  const [isErrorLogOpen, setIsErrorLogOpen] = useState(false);
   const [feedbackText, setFeedbackText] = useState("");
   const navigate = useNavigate();
 
@@ -75,6 +78,13 @@ const Header = ({
 
   const handleSubmitFeedback = () => {
     if (feedbackText.trim()) {
+      // Import error codes
+      const {
+        logError,
+        ErrorCodes,
+        getErrorLogs,
+      } = require("@/lib/errorCodes");
+
       // Log error report to database
       const errorReport = {
         userId: StorageManager.getItem("taskManagerUser")
@@ -84,6 +94,8 @@ const Header = ({
         userAgent: navigator.userAgent,
         url: window.location.href,
         feedback: feedbackText,
+        // Include the last 5 error logs for context
+        recentErrors: getErrorLogs().slice(0, 5),
       };
 
       // Save to localStorage for demo purposes (in a real app, this would be sent to a database)
@@ -92,6 +104,9 @@ const Header = ({
         existingReports.push(errorReport);
         StorageManager.setJSON("feedbackReports", existingReports);
       } catch (error) {
+        logError(ErrorCodes.UI_FORM_VALIDATION_FAILED, error, {
+          form: "feedback",
+        });
         console.error("Error saving feedback:", error);
         StorageManager.setJSON("feedbackReports", [errorReport]);
       }
@@ -173,6 +188,25 @@ const Header = ({
             </Tooltip>
           </TooltipProvider>
 
+          {/* Error Logs Button */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsErrorLogOpen(true)}
+                  className="h-10 w-10 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                >
+                  <AlertTriangle className="h-5 w-5 md:h-6 md:w-6 text-amber-500" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>View Error Logs</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
           {/* Settings Button */}
           <TooltipProvider>
             <Tooltip>
@@ -245,6 +279,13 @@ const Header = ({
               Submit Feedback
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Error Logs Dialog */}
+      <Dialog open={isErrorLogOpen} onOpenChange={setIsErrorLogOpen}>
+        <DialogContent className="sm:max-w-[90vw] max-h-[90vh] h-[90vh]">
+          <ErrorLogViewer onClose={() => setIsErrorLogOpen(false)} />
         </DialogContent>
       </Dialog>
     </>

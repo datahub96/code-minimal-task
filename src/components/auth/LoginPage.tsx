@@ -52,15 +52,35 @@ const LoginPage = () => {
             id: "demo-user-id",
             username,
           };
+
+          // First check if localStorage is available
+          if (!StorageManager.isLocalStorageAvailable()) {
+            // Import error codes
+            const { logError, ErrorCodes } = require("@/lib/errorCodes");
+            logError(
+              ErrorCodes.STORAGE_NOT_AVAILABLE,
+              new Error("Local storage is not available"),
+              { method: "handleLogin", username },
+            );
+            throw new Error("Local storage is not available in your browser");
+          }
+
           const success = StorageManager.setJSON("taskManagerUser", userData);
 
           if (!success) {
+            // Import error codes
+            const { logError, ErrorCodes } = require("@/lib/errorCodes");
+            logError(
+              ErrorCodes.AUTH_LOGIN_FAILED,
+              new Error("Failed to save user data"),
+              { method: "handleLogin", username },
+            );
             throw new Error("Failed to save user data");
           }
         } catch (error) {
           console.error("Error storing user data:", error);
           setError(
-            "Unable to store user data. Please check your browser settings.",
+            `Unable to store user data. Please check your browser settings and ensure cookies/local storage are enabled. (Error code: ${error.code || "TM-AUTH-101"})`,
           );
           setLoading(false);
           return;

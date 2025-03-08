@@ -5,9 +5,30 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
 
 // Check if credentials are available
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn(
-    "Supabase credentials not found. Using localStorage for data persistence."
-  );
+let supabase;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Import error codes
+import { logError, ErrorCodes } from "./errorCodes";
+
+if (supabaseUrl && supabaseAnonKey) {
+  try {
+    supabase = createClient(supabaseUrl, supabaseAnonKey);
+    console.log("Supabase client initialized successfully");
+  } catch (error) {
+    logError(ErrorCodes.DB_CONNECTION_FAILED, error, { source: "supabase.ts" });
+    console.error("Error initializing Supabase client:", error);
+    supabase = null;
+  }
+} else {
+  logError(
+    ErrorCodes.DB_SUPABASE_NOT_CONFIGURED,
+    new Error("Supabase credentials not found"),
+    { supabaseUrl: !!supabaseUrl, supabaseAnonKey: !!supabaseAnonKey },
+  );
+  console.warn(
+    "Supabase credentials not found. Using localStorage for data persistence.",
+  );
+  supabase = null;
+}
+
+export { supabase };

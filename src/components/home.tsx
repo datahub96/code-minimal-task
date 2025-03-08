@@ -341,6 +341,16 @@ const Home = () => {
       }
 
       if (!success) {
+        // Import error codes
+        const { logError, ErrorCodes } = require("@/lib/errorCodes");
+        logError(
+          ErrorCodes.STORAGE_WRITE_FAILED,
+          new Error("Failed to save tasks"),
+          {
+            tasksCount: tasksForStorage.length,
+            userId: currentUser?.id,
+          },
+        );
         console.error("Failed to save tasks to localStorage");
       } else {
         console.log(
@@ -348,6 +358,13 @@ const Home = () => {
         );
       }
     } catch (error) {
+      // Import error codes
+      const { logError, ErrorCodes } = require("@/lib/errorCodes");
+      logError(ErrorCodes.TASK_UPDATE_FAILED, error, {
+        method: "saveTasksToLocalStorage",
+        tasksCount: tasksToSave.length,
+        userId: currentUser?.id,
+      });
       console.error("Error saving tasks to localStorage:", error);
     }
   };
@@ -366,10 +383,22 @@ const Home = () => {
 
   const confirmTaskDelete = async () => {
     if (deleteTaskId) {
-      const updatedTasks = tasks.filter((task) => task.id !== deleteTaskId);
-      setTasks(updatedTasks);
-      saveTasksToLocalStorage(updatedTasks);
-      setDeleteTaskId(null);
+      try {
+        const updatedTasks = tasks.filter((task) => task.id !== deleteTaskId);
+        setTasks(updatedTasks);
+        saveTasksToLocalStorage(updatedTasks);
+        setDeleteTaskId(null);
+      } catch (error) {
+        // Import error codes
+        const { logError, ErrorCodes } = require("@/lib/errorCodes");
+        const errorCode = logError(ErrorCodes.TASK_DELETE_FAILED, error, {
+          taskId: deleteTaskId,
+        });
+        console.error("Error deleting task:", error);
+        alert(
+          `There was an error deleting the task. Please try again. (Error code: ${errorCode})`,
+        );
+      }
     }
   };
 
