@@ -1,54 +1,115 @@
 import { supabase } from "./supabase";
 import { User, Task, Category } from "@/types/app";
 
+// Flag to determine if we should use Supabase or localStorage
+const useSupabase =
+  !!import.meta.env.VITE_SUPABASE_URL &&
+  !!import.meta.env.VITE_SUPABASE_ANON_KEY;
+
 // User functions
 export async function createUser(userData) {
-  const { data, error } = await supabase
-    .from("users")
-    .insert(userData)
-    .select()
-    .single();
+  if (useSupabase) {
+    try {
+      const { data, error } = await supabase
+        .from("users")
+        .insert(userData)
+        .select()
+        .single();
 
-  if (error) throw error;
-  return data;
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error("Error creating user in Supabase:", error);
+      // Fall back to localStorage
+    }
+  }
+
+  // localStorage fallback
+  try {
+    const users = JSON.parse(localStorage.getItem("taskManagerUsers") || "[]");
+    const newUser = { ...userData, id: `user-${Date.now()}` };
+    users.push(newUser);
+    localStorage.setItem("taskManagerUsers", JSON.stringify(users));
+    return newUser;
+  } catch (error) {
+    console.error("Error creating user in localStorage:", error);
+    throw error;
+  }
 }
 
 export async function getUserByUsername(username) {
-  const { data, error } = await supabase
-    .from("users")
-    .select("*")
-    .eq("username", username)
-    .single();
+  if (useSupabase) {
+    try {
+      const { data, error } = await supabase
+        .from("users")
+        .select("*")
+        .eq("username", username)
+        .single();
 
-  if (error && error.code !== "PGRST116") throw error;
-  return data;
+      if (error && error.code !== "PGRST116") throw error;
+      return data;
+    } catch (error) {
+      console.error("Error getting user from Supabase:", error);
+      // Fall back to localStorage
+    }
+  }
+
+  // localStorage fallback
+  try {
+    const users = JSON.parse(localStorage.getItem("taskManagerUsers") || "[]");
+    return users.find((user) => user.username === username) || null;
+  } catch (error) {
+    console.error("Error getting user from localStorage:", error);
+    return null;
+  }
 }
 
 // Task functions
 export async function getTasks(userId) {
-  const { data, error } = await supabase
-    .from("tasks")
-    .select("*, categories(*)")
-    .eq("user_id", userId);
+  if (useSupabase) {
+    try {
+      const { data, error } = await supabase
+        .from("tasks")
+        .select("*, categories(*)")
+        .eq("user_id", userId);
 
-  if (error) throw error;
+      if (error) throw error;
 
-  // Transform the data to match the app's Task interface
-  return data.map((task) => ({
-    id: task.id,
-    title: task.title,
-    description: task.description,
-    deadline: task.deadline ? new Date(task.deadline) : undefined,
-    category: task.categories
-      ? {
-          name: task.categories.name,
-          color: task.categories.color,
-        }
-      : undefined,
-    completed: task.completed,
-    timerStarted: task.timer_started,
-    timeSpent: task.time_spent,
-  }));
+      // Transform the data to match the app's Task interface
+      return data.map((task) => ({
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        deadline: task.deadline ? new Date(task.deadline) : undefined,
+        category: task.categories
+          ? {
+              name: task.categories.name,
+              color: task.categories.color,
+            }
+          : undefined,
+        completed: task.completed,
+        timerStarted: task.timer_started,
+        timeSpent: task.time_spent,
+      }));
+    } catch (error) {
+      console.error("Error getting tasks from Supabase:", error);
+      // Fall back to localStorage
+    }
+  }
+
+  // localStorage fallback
+  try {
+    const tasks = JSON.parse(
+      localStorage.getItem(`taskManagerTasks_${userId}`) || "[]",
+    );
+    return tasks.map((task) => ({
+      ...task,
+      deadline: task.deadline ? new Date(task.deadline) : undefined,
+    }));
+  } catch (error) {
+    console.error("Error getting tasks from localStorage:", error);
+    return [];
+  }
 }
 
 export async function createTask(taskData) {

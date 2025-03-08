@@ -46,13 +46,22 @@ const LoginPage = () => {
       if (username === DEMO_USER.username && password === DEMO_USER.password) {
         // Demo user login - no need for database
         // Store user info in localStorage
-        localStorage.setItem(
-          "taskManagerUser",
-          JSON.stringify({
-            id: "demo-user-id",
-            username,
-          }),
-        );
+        try {
+          localStorage.setItem(
+            "taskManagerUser",
+            JSON.stringify({
+              id: "demo-user-id",
+              username,
+            }),
+          );
+        } catch (error) {
+          console.error("Error storing user data:", error);
+          setError(
+            "Unable to store user data. Please check your browser settings.",
+          );
+          setLoading(false);
+          return;
+        }
 
         // Set default settings for demo user
         const defaultSettings = {
@@ -116,45 +125,59 @@ const LoginPage = () => {
         navigate("/");
       } else {
         // Check if user exists in localStorage
-        const users = JSON.parse(
-          localStorage.getItem("taskManagerUsers") || "[]",
-        );
-        const user = users.find(
-          (u: any) => u.username === username && u.password === password,
-        );
-
-        if (user) {
-          // Store user info in localStorage
-          localStorage.setItem(
-            "taskManagerUser",
-            JSON.stringify({
-              id: user.id,
-              username: user.username,
-            }),
+        try {
+          const users = JSON.parse(
+            localStorage.getItem("taskManagerUsers") || "[]",
+          );
+          const user = users.find(
+            (u: any) => u.username === username && u.password === password,
           );
 
-          // Load user's settings
-          const userSettings = JSON.parse(
-            localStorage.getItem(`taskManagerSettings_${user.id}`) || "{}",
-          );
-          localStorage.setItem(
-            "taskManagerSettings",
-            JSON.stringify(userSettings),
-          );
+          if (user) {
+            // Store user info in localStorage
+            localStorage.setItem(
+              "taskManagerUser",
+              JSON.stringify({
+                id: user.id,
+                username: user.username,
+              }),
+            );
 
-          // Load user's tasks
-          const userTasks = JSON.parse(
-            localStorage.getItem(`taskManagerTasks_${user.id}`) || "[]",
-          );
-          localStorage.setItem("taskManagerTasks", JSON.stringify(userTasks));
+            // Load user's settings
+            try {
+              const userSettings = JSON.parse(
+                localStorage.getItem(`taskManagerSettings_${user.id}`) || "{}",
+              );
+              localStorage.setItem(
+                "taskManagerSettings",
+                JSON.stringify(userSettings),
+              );
 
-          // Clear the planner shown flag so it shows on fresh login
-          localStorage.removeItem("plannerShownForSession");
+              // Load user's tasks
+              const userTasks = JSON.parse(
+                localStorage.getItem(`taskManagerTasks_${user.id}`) || "[]",
+              );
+              localStorage.setItem(
+                "taskManagerTasks",
+                JSON.stringify(userTasks),
+              );
+            } catch (error) {
+              console.error("Error loading user data:", error);
+              localStorage.setItem("taskManagerSettings", JSON.stringify({}));
+              localStorage.setItem("taskManagerTasks", JSON.stringify([]));
+            }
 
-          // Redirect to home page
-          navigate("/");
-        } else {
-          setError("Invalid username or password");
+            // Clear the planner shown flag so it shows on fresh login
+            localStorage.removeItem("plannerShownForSession");
+
+            // Redirect to home page
+            navigate("/");
+          } else {
+            setError("Invalid username or password");
+          }
+        } catch (error) {
+          console.error("Error checking user credentials:", error);
+          setError("An error occurred during login. Please try again.");
         }
       }
     } catch (err) {
@@ -185,28 +208,35 @@ const LoginPage = () => {
       }
 
       // Check if username already exists
-      const users = JSON.parse(
-        localStorage.getItem("taskManagerUsers") || "[]",
-      );
-      if (users.some((u: any) => u.username === username)) {
-        setError("Username already exists");
+      try {
+        const users = JSON.parse(
+          localStorage.getItem("taskManagerUsers") || "[]",
+        );
+        if (users.some((u: any) => u.username === username)) {
+          setError("Username already exists");
+          setLoading(false);
+          return;
+        }
+
+        // Create new user
+        const userId = `user-${Date.now()}`;
+        const newUser = {
+          id: userId,
+          username,
+          email,
+          password, // In a real app, this would be hashed
+          created_at: new Date().toISOString(),
+        };
+
+        // Add user to users list
+        users.push(newUser);
+        localStorage.setItem("taskManagerUsers", JSON.stringify(users));
+      } catch (error) {
+        console.error("Error checking username:", error);
+        setError("An error occurred during registration. Please try again.");
         setLoading(false);
         return;
       }
-
-      // Create new user
-      const userId = `user-${Date.now()}`;
-      const newUser = {
-        id: userId,
-        username,
-        email,
-        password, // In a real app, this would be hashed
-        created_at: new Date().toISOString(),
-      };
-
-      // Add user to users list
-      users.push(newUser);
-      localStorage.setItem("taskManagerUsers", JSON.stringify(users));
 
       // Store user info in localStorage for current session
       localStorage.setItem(

@@ -125,67 +125,77 @@ const Home = () => {
   // Load user settings and tasks from localStorage when component mounts
   useEffect(() => {
     // Get current user
-    const userJson = localStorage.getItem("taskManagerUser");
-    if (userJson) {
-      const user = JSON.parse(userJson);
-      setCurrentUser(user);
+    try {
+      const userJson = localStorage.getItem("taskManagerUser");
+      if (userJson) {
+        const user = JSON.parse(userJson);
+        setCurrentUser(user);
 
-      // Show planner on login if enabled and this is a fresh login
-      const hasShownPlanner = localStorage.getItem("plannerShownForSession");
-      if (showPlannerOnLogin && !hasShownPlanner) {
-        setIsPlannerOpen(true);
-        // Mark that we've shown the planner for this session
-        localStorage.setItem("plannerShownForSession", "true");
-      }
-    }
-
-    // Load settings
-    const savedSettings = localStorage.getItem("taskManagerSettings");
-    if (savedSettings) {
-      const parsedSettings = JSON.parse(savedSettings);
-      setUserSettings(parsedSettings);
-
-      // Apply saved dark mode setting
-      if (parsedSettings.darkMode !== isDarkMode) {
-        setIsDarkMode(parsedSettings.darkMode);
-        if (parsedSettings.darkMode) {
-          document.documentElement.classList.add("dark");
-        } else {
-          document.documentElement.classList.remove("dark");
+        // Show planner on login if enabled and this is a fresh login
+        const hasShownPlanner = localStorage.getItem("plannerShownForSession");
+        if (showPlannerOnLogin && !hasShownPlanner) {
+          setIsPlannerOpen(true);
+          // Mark that we've shown the planner for this session
+          localStorage.setItem("plannerShownForSession", "true");
         }
       }
 
-      // Apply saved default view
-      if (parsedSettings.defaultView) {
-        setCurrentView(parsedSettings.defaultView);
-      }
-
-      // Apply saved planner setting
-      if (parsedSettings.showPlannerOnLogin !== undefined) {
-        setShowPlannerOnLogin(parsedSettings.showPlannerOnLogin);
-      }
-    }
-
-    // Load tasks
-    const savedTasks = localStorage.getItem("taskManagerTasks");
-    if (savedTasks) {
+      // Load settings
       try {
-        const parsedTasks = JSON.parse(savedTasks);
-        // Convert ISO date strings back to Date objects
-        const tasksWithDates = parsedTasks.map((task: any) => ({
-          ...task,
-          deadline: task.deadline ? new Date(task.deadline) : undefined,
-        }));
+        const savedSettings = localStorage.getItem("taskManagerSettings");
+        if (savedSettings) {
+          const parsedSettings = JSON.parse(savedSettings);
+          setUserSettings(parsedSettings);
 
-        // Load all tasks but only show non-completed tasks by default
-        const activeTasks = tasksWithDates.filter((task) => !task.completed);
-        setTasks(activeTasks);
+          // Apply saved dark mode setting
+          if (parsedSettings.darkMode !== isDarkMode) {
+            setIsDarkMode(parsedSettings.darkMode);
+            if (parsedSettings.darkMode) {
+              document.documentElement.classList.add("dark");
+            } else {
+              document.documentElement.classList.remove("dark");
+            }
+          }
+
+          // Apply saved default view
+          if (parsedSettings.defaultView) {
+            setCurrentView(parsedSettings.defaultView);
+          }
+
+          // Apply saved planner setting
+          if (parsedSettings.showPlannerOnLogin !== undefined) {
+            setShowPlannerOnLogin(parsedSettings.showPlannerOnLogin);
+          }
+        }
+
+        // Load tasks
+        try {
+          const savedTasks = localStorage.getItem("taskManagerTasks");
+          if (savedTasks) {
+            const parsedTasks = JSON.parse(savedTasks);
+            // Convert ISO date strings back to Date objects
+            const tasksWithDates = parsedTasks.map((task: any) => ({
+              ...task,
+              deadline: task.deadline ? new Date(task.deadline) : undefined,
+            }));
+
+            // Load all tasks but only show non-completed tasks by default
+            const activeTasks = tasksWithDates.filter(
+              (task) => !task.completed,
+            );
+            setTasks(activeTasks);
+          } else {
+            setTasks([]);
+          }
+        } catch (error) {
+          console.error("Error loading tasks or settings:", error);
+          setTasks([]);
+        }
       } catch (error) {
-        console.error("Error parsing saved tasks:", error);
-        setTasks([]);
+        console.error("Error loading settings:", error);
       }
-    } else {
-      setTasks([]);
+    } catch (error) {
+      console.error("Error loading user data:", error);
     }
   }, []);
 
@@ -224,21 +234,21 @@ const Home = () => {
   // Task operations
   const handleTaskComplete = async (taskId: string) => {
     // Get all tasks from localStorage to ensure we have the complete set
-    const savedTasks = localStorage.getItem("taskManagerTasks");
     let allTasks = [];
 
-    if (savedTasks) {
-      try {
+    try {
+      const savedTasks = localStorage.getItem("taskManagerTasks");
+      if (savedTasks) {
         const parsedTasks = JSON.parse(savedTasks);
         allTasks = parsedTasks.map((task: any) => ({
           ...task,
           deadline: task.deadline ? new Date(task.deadline) : undefined,
         }));
-      } catch (error) {
-        console.error("Error parsing saved tasks:", error);
+      } else {
         allTasks = [...tasks]; // Fallback to current state
       }
-    } else {
+    } catch (error) {
+      console.error("Error parsing saved tasks:", error);
       allTasks = [...tasks]; // Fallback to current state
     }
 
@@ -306,21 +316,25 @@ const Home = () => {
 
   // Helper function to save tasks to localStorage
   const saveTasksToLocalStorage = (tasksToSave: Task[]) => {
-    // Convert Date objects to ISO strings for storage
-    const tasksForStorage = tasksToSave.map((task) => ({
-      ...task,
-      deadline: task.deadline ? task.deadline.toISOString() : undefined,
-    }));
+    try {
+      // Convert Date objects to ISO strings for storage
+      const tasksForStorage = tasksToSave.map((task) => ({
+        ...task,
+        deadline: task.deadline ? task.deadline.toISOString() : undefined,
+      }));
 
-    // Save to session storage
-    localStorage.setItem("taskManagerTasks", JSON.stringify(tasksForStorage));
+      // Save to session storage
+      localStorage.setItem("taskManagerTasks", JSON.stringify(tasksForStorage));
 
-    // Save to user-specific storage if user is logged in
-    if (currentUser?.id) {
-      localStorage.setItem(
-        `taskManagerTasks_${currentUser.id}`,
-        JSON.stringify(tasksForStorage),
-      );
+      // Save to user-specific storage if user is logged in
+      if (currentUser?.id) {
+        localStorage.setItem(
+          `taskManagerTasks_${currentUser.id}`,
+          JSON.stringify(tasksForStorage),
+        );
+      }
+    } catch (error) {
+      console.error("Error saving tasks to localStorage:", error);
     }
   };
 

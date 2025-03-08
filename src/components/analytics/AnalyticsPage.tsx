@@ -86,36 +86,45 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ userId }) => {
           return;
         }
 
-        const user = JSON.parse(userJson);
-        const currentUserId = user.id;
+        try {
+          const user = JSON.parse(userJson);
+          const currentUserId = user.id;
 
-        // Get tasks for the current user
-        const tasksJson =
-          localStorage.getItem(`taskManagerTasks_${currentUserId}`) ||
-          localStorage.getItem("taskManagerTasks");
+          // Get tasks for the current user
+          const tasksJson =
+            localStorage.getItem(`taskManagerTasks_${currentUserId}`) ||
+            localStorage.getItem("taskManagerTasks");
 
-        if (!tasksJson) {
+          if (!tasksJson) {
+            setTasks([]);
+            setLoading(false);
+            return;
+          }
+
+          const parsedTasks = JSON.parse(tasksJson);
+          // Convert ISO date strings back to Date objects
+          const tasksWithDates = parsedTasks.map((task: any) => ({
+            ...task,
+            deadline: task.deadline ? new Date(task.deadline) : undefined,
+            // Add created and completed dates if they don't exist (for demo purposes)
+            createdAt:
+              task.createdAt ||
+              new Date(
+                Date.now() - Math.random() * 30 * 86400000,
+              ).toISOString(),
+            completedAt: task.completed
+              ? task.completedAt ||
+                new Date(
+                  Date.now() - Math.random() * 15 * 86400000,
+                ).toISOString()
+              : undefined,
+          }));
+
+          setTasks(tasksWithDates);
+        } catch (error) {
+          console.error("Error parsing user data:", error);
           setTasks([]);
-          setLoading(false);
-          return;
         }
-
-        const parsedTasks = JSON.parse(tasksJson);
-        // Convert ISO date strings back to Date objects
-        const tasksWithDates = parsedTasks.map((task: any) => ({
-          ...task,
-          deadline: task.deadline ? new Date(task.deadline) : undefined,
-          // Add created and completed dates if they don't exist (for demo purposes)
-          createdAt:
-            task.createdAt ||
-            new Date(Date.now() - Math.random() * 30 * 86400000).toISOString(),
-          completedAt: task.completed
-            ? task.completedAt ||
-              new Date(Date.now() - Math.random() * 15 * 86400000).toISOString()
-            : undefined,
-        }));
-
-        setTasks(tasksWithDates);
       } catch (error) {
         console.error("Error loading tasks for analytics:", error);
         setTasks([]);

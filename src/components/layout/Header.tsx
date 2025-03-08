@@ -86,11 +86,19 @@ const Header = ({
       };
 
       // Save to localStorage for demo purposes (in a real app, this would be sent to a database)
-      const existingReports = JSON.parse(
-        localStorage.getItem("feedbackReports") || "[]",
-      );
-      existingReports.push(errorReport);
-      localStorage.setItem("feedbackReports", JSON.stringify(existingReports));
+      try {
+        const existingReports = JSON.parse(
+          localStorage.getItem("feedbackReports") || "[]",
+        );
+        existingReports.push(errorReport);
+        localStorage.setItem(
+          "feedbackReports",
+          JSON.stringify(existingReports),
+        );
+      } catch (error) {
+        console.error("Error saving feedback:", error);
+        localStorage.setItem("feedbackReports", JSON.stringify([errorReport]));
+      }
 
       console.log("Feedback submitted:", errorReport);
       setFeedbackText("");

@@ -126,21 +126,25 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   };
 
   const saveSettings = async (changedSettings: any) => {
-    const newSettings = {
-      darkMode,
-      defaultView,
-      notificationsEnabled,
-      notificationTime,
-      showPlannerOnLogin,
-      categories,
-      ...changedSettings,
-    };
-    console.log("Saving settings:", newSettings);
+    try {
+      const newSettings = {
+        darkMode,
+        defaultView,
+        notificationsEnabled,
+        notificationTime,
+        showPlannerOnLogin,
+        categories,
+        ...changedSettings,
+      };
+      console.log("Saving settings:", newSettings);
 
-    // Save settings to localStorage
-    localStorage.setItem("taskManagerSettings", JSON.stringify(newSettings));
+      // Save settings to localStorage
+      localStorage.setItem("taskManagerSettings", JSON.stringify(newSettings));
 
-    onSettingsChange(newSettings);
+      onSettingsChange(newSettings);
+    } catch (error) {
+      console.error("Error saving settings:", error);
+    }
   };
 
   return (

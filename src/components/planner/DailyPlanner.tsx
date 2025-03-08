@@ -37,16 +37,23 @@ const DailyPlanner: React.FC<DailyPlannerProps> = ({
   // Load saved planner data when component mounts or date changes
   useEffect(() => {
     const loadPlannerData = () => {
-      const dateKey = format(date, "yyyy-MM-dd");
-      const savedData = localStorage.getItem(`dailyPlanner_${dateKey}`);
+      try {
+        const dateKey = format(date, "yyyy-MM-dd");
+        const savedData = localStorage.getItem(`dailyPlanner_${dateKey}`);
 
-      if (savedData) {
-        const parsedData = JSON.parse(savedData);
-        setDailyGoal(parsedData.dailyGoal || "");
-        setPlanItems(parsedData.planItems || []);
-        setNotes(parsedData.notes || "");
-      } else {
-        // Reset form for new date
+        if (savedData) {
+          const parsedData = JSON.parse(savedData);
+          setDailyGoal(parsedData.dailyGoal || "");
+          setPlanItems(parsedData.planItems || []);
+          setNotes(parsedData.notes || "");
+        } else {
+          // Reset form for new date
+          setDailyGoal("");
+          setPlanItems([]);
+          setNotes("");
+        }
+      } catch (error) {
+        console.error("Error loading planner data:", error);
         setDailyGoal("");
         setPlanItems([]);
         setNotes("");
@@ -81,38 +88,46 @@ const DailyPlanner: React.FC<DailyPlannerProps> = ({
   };
 
   const handleSave = () => {
-    // Save to localStorage
-    const dateKey = format(date, "yyyy-MM-dd");
-    const dataToSave = {
-      dailyGoal,
-      planItems,
-      notes,
-    };
-    localStorage.setItem(`dailyPlanner_${dateKey}`, JSON.stringify(dataToSave));
+    try {
+      // Save to localStorage
+      const dateKey = format(date, "yyyy-MM-dd");
+      const dataToSave = {
+        dailyGoal,
+        planItems,
+        notes,
+      };
+      localStorage.setItem(
+        `dailyPlanner_${dateKey}`,
+        JSON.stringify(dataToSave),
+      );
 
-    // Convert plan items to tasks and add them to the task list
-    const tasksToAdd = planItems
-      .filter((item) => !item.completed) // Only add uncompleted items as tasks
-      .map((item) => {
-        // Create a date for tomorrow by adding 1 day to the selected date
-        const nextDay = new Date(date);
-        nextDay.setDate(nextDay.getDate() + 1);
+      // Convert plan items to tasks and add them to the task list
+      const tasksToAdd = planItems
+        .filter((item) => !item.completed) // Only add uncompleted items as tasks
+        .map((item) => {
+          // Create a date for tomorrow by adding 1 day to the selected date
+          const nextDay = new Date(date);
+          nextDay.setDate(nextDay.getDate() + 1);
 
-        return {
-          id: `planner-${item.id}`,
-          title: item.text,
-          description: `Added from daily planner (${format(date, "MMM d, yyyy")})`,
-          deadline: nextDay,
-          category: { name: "Daily Plan", color: "#8b5cf6" }, // Purple color for planner tasks
-          completed: false,
-        };
-      });
+          return {
+            id: `planner-${item.id}`,
+            title: item.text,
+            description: `Added from daily planner (${format(date, "MMM d, yyyy")})`,
+            deadline: nextDay,
+            category: { name: "Daily Plan", color: "#8b5cf6" }, // Purple color for planner tasks
+            completed: false,
+          };
+        });
 
-    if (tasksToAdd.length > 0) {
-      onAddTasks(tasksToAdd);
+      if (tasksToAdd.length > 0) {
+        onAddTasks(tasksToAdd);
+      }
+
+      onClose();
+    } catch (error) {
+      console.error("Error saving planner data:", error);
+      alert("There was an error saving your planner data. Please try again.");
     }
-
-    onClose();
   };
 
   return (
