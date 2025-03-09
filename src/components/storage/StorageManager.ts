@@ -11,28 +11,9 @@ export class StorageManager {
     }
 
     try {
-      // Check if localStorage exists
-      if (!window.localStorage) {
-        return false;
-      }
-
-      const testKey = "__storage_test__";
-      localStorage.setItem(testKey, testKey);
-      const testValue = localStorage.getItem(testKey);
-      localStorage.removeItem(testKey);
-
-      // Verify the test was successful
-      return testValue === testKey;
+      // Simplified check that's less likely to fail
+      return !!window.localStorage;
     } catch (e) {
-      // Import here to avoid circular dependency
-      try {
-        const { logError, ErrorCodes } = require("@/lib/errorCodes");
-        logError(ErrorCodes.STORAGE_NOT_AVAILABLE, e, {
-          method: "isLocalStorageAvailable",
-        });
-      } catch (importError) {
-        console.error("Error importing error codes:", importError);
-      }
       console.warn("localStorage test failed:", e);
       return false;
     }
@@ -152,26 +133,13 @@ export class StorageManager {
   // Set JSON data in localStorage
   static setJSON<T>(key: string, value: T): boolean {
     try {
+      // Try direct localStorage first (most reliable)
       const jsonString = JSON.stringify(value);
-      const success = this.setItem(key, jsonString);
-
-      if (!success) {
-        // Try direct localStorage as fallback
-        localStorage.setItem(key, jsonString);
-        return true;
-      }
-
-      return success;
+      localStorage.setItem(key, jsonString);
+      return true;
     } catch (error) {
-      console.error(`Error stringifying JSON for key ${key}:`, error);
-      try {
-        // Last resort fallback
-        localStorage.setItem(key, JSON.stringify(value));
-        return true;
-      } catch (fallbackError) {
-        console.error(`Fallback also failed for key ${key}:`, fallbackError);
-        return false;
-      }
+      console.error(`Error saving JSON for key ${key}:`, error);
+      return false;
     }
   }
 }

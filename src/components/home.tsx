@@ -326,54 +326,39 @@ const Home = () => {
         deadline: task.deadline ? task.deadline.toISOString() : undefined,
       }));
 
-      // Save to localStorage using StorageManager
-      const success = StorageManager.setJSON(
-        "taskManagerTasks",
-        tasksForStorage,
+      // Direct localStorage save first (most reliable)
+      localStorage.setItem("taskManagerTasks", JSON.stringify(tasksForStorage));
+      console.log(
+        `Successfully saved ${tasksForStorage.length} tasks to localStorage`,
       );
 
       // Save to user-specific storage if user is logged in
       if (currentUser?.id) {
-        StorageManager.setJSON(
+        localStorage.setItem(
           `taskManagerTasks_${currentUser.id}`,
-          tasksForStorage,
+          JSON.stringify(tasksForStorage),
         );
       }
 
-      if (!success) {
-        // Import error codes
-        try {
-          const { logError, ErrorCodes } = require("@/lib/errorCodes");
-          logError(
-            ErrorCodes.STORAGE_WRITE_FAILED,
-            new Error("Failed to save tasks"),
-            {
-              tasksCount: tasksForStorage.length,
-              userId: currentUser?.id,
-            },
+      // Also try StorageManager as backup
+      try {
+        StorageManager.setJSON("taskManagerTasks", tasksForStorage);
+
+        if (currentUser?.id) {
+          StorageManager.setJSON(
+            `taskManagerTasks_${currentUser.id}`,
+            tasksForStorage,
           );
-        } catch (importError) {
-          console.error("Error importing error codes:", importError);
         }
-        console.error("Failed to save tasks to localStorage");
-      } else {
+      } catch (storageManagerError) {
         console.log(
-          `Successfully saved ${tasksForStorage.length} tasks to localStorage`,
+          "StorageManager failed but direct localStorage worked",
+          storageManagerError,
         );
       }
     } catch (error) {
-      // Import error codes
-      try {
-        const { logError, ErrorCodes } = require("@/lib/errorCodes");
-        logError(ErrorCodes.TASK_UPDATE_FAILED, error, {
-          method: "saveTasksToLocalStorage",
-          tasksCount: tasksToSave.length,
-          userId: currentUser?.id,
-        });
-      } catch (importError) {
-        console.error("Error importing error codes:", importError);
-      }
       console.error("Error saving tasks to localStorage:", error);
+      alert("There was an error saving your tasks. Please try again.");
     }
   };
 
@@ -479,32 +464,40 @@ const Home = () => {
         updatedTasks = [...tasks, newTask];
       }
 
+      // Update state first
       setTasks(updatedTasks);
 
-      // Try to save tasks with error handling
+      // Save directly to localStorage first (most reliable method)
       try {
-        saveTasksToLocalStorage(updatedTasks);
-      } catch (storageError) {
-        console.error("Error saving tasks to storage manager:", storageError);
-        // Fallback to direct localStorage
+        const tasksForStorage = updatedTasks.map((task) => ({
+          ...task,
+          deadline: task.deadline ? task.deadline.toISOString() : undefined,
+        }));
+
+        // Direct localStorage save
+        localStorage.setItem(
+          "taskManagerTasks",
+          JSON.stringify(tasksForStorage),
+        );
+        console.log("Saved tasks using direct localStorage");
+
+        // Also try the StorageManager as backup
         try {
-          const tasksForStorage = updatedTasks.map((task) => ({
-            ...task,
-            deadline: task.deadline ? task.deadline.toISOString() : undefined,
-          }));
-          localStorage.setItem(
-            "taskManagerTasks",
-            JSON.stringify(tasksForStorage),
-          );
-          console.log("Saved tasks using direct localStorage");
-        } catch (fallbackError) {
-          console.error("Fallback storage also failed:", fallbackError);
-          alert(
-            "Warning: Your tasks may not be saved. Please try again or check your browser settings.",
+          saveTasksToLocalStorage(updatedTasks);
+        } catch (storageManagerError) {
+          console.log(
+            "StorageManager failed but direct localStorage worked",
+            storageManagerError,
           );
         }
+      } catch (error) {
+        console.error("Error saving tasks:", error);
+        alert(
+          "Warning: Your tasks may not be saved. Please try again or check your browser settings.",
+        );
       }
 
+      // Close the form regardless
       setIsTaskFormOpen(false);
     } catch (error) {
       console.error("Error in task form submission:", error);

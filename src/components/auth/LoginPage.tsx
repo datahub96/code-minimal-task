@@ -46,49 +46,29 @@ const LoginPage = () => {
     try {
       if (username === DEMO_USER.username && password === DEMO_USER.password) {
         // Demo user login - no need for database
-        // Store user info in localStorage using StorageManager
+        // Store user info directly in localStorage first
         try {
           const userData = {
             id: "demo-user-id",
             username,
           };
 
-          // First check if localStorage is available
-          if (!StorageManager.isLocalStorageAvailable()) {
-            // Import error codes
-            try {
-              const { logError, ErrorCodes } = require("@/lib/errorCodes");
-              logError(
-                ErrorCodes.STORAGE_NOT_AVAILABLE,
-                new Error("Local storage is not available"),
-                { method: "handleLogin", username },
-              );
-            } catch (e) {
-              console.error("Error importing error codes:", e);
-            }
-            throw new Error("Local storage is not available in your browser");
-          }
+          // Direct localStorage save (most reliable)
+          localStorage.setItem("taskManagerUser", JSON.stringify(userData));
 
-          const success = StorageManager.setJSON("taskManagerUser", userData);
-
-          if (!success) {
-            // Import error codes
-            try {
-              const { logError, ErrorCodes } = require("@/lib/errorCodes");
-              logError(
-                ErrorCodes.AUTH_LOGIN_FAILED,
-                new Error("Failed to save user data"),
-                { method: "handleLogin", username },
-              );
-            } catch (e) {
-              console.error("Error importing error codes:", e);
-            }
-            throw new Error("Failed to save user data");
+          // Also try StorageManager as backup
+          try {
+            StorageManager.setJSON("taskManagerUser", userData);
+          } catch (storageManagerError) {
+            console.log(
+              "StorageManager failed but direct localStorage worked",
+              storageManagerError,
+            );
           }
         } catch (error) {
           console.error("Error storing user data:", error);
           setError(
-            `Unable to store user data. Please check your browser settings and ensure cookies/local storage are enabled. (Error code: ${error.code || "TM-AUTH-101"})`,
+            `Unable to store user data. Please check your browser settings and ensure cookies/local storage are enabled.`,
           );
           setLoading(false);
           return;
@@ -163,31 +143,40 @@ const LoginPage = () => {
 
           if (user) {
             // Store user info in localStorage
-            StorageManager.setJSON("taskManagerUser", {
-              id: user.id,
-              username: user.username,
-            });
+            localStorage.setItem(
+              "taskManagerUser",
+              JSON.stringify({
+                id: user.id,
+                username: user.username,
+              }),
+            );
 
             // Load user's settings
             try {
               const userSettings = JSON.parse(
                 localStorage.getItem(`taskManagerSettings_${user.id}`) || "{}",
               );
-              StorageManager.setJSON("taskManagerSettings", userSettings);
+              localStorage.setItem(
+                "taskManagerSettings",
+                JSON.stringify(userSettings),
+              );
 
               // Load user's tasks
               const userTasks = JSON.parse(
                 localStorage.getItem(`taskManagerTasks_${user.id}`) || "[]",
               );
-              StorageManager.setJSON("taskManagerTasks", userTasks);
+              localStorage.setItem(
+                "taskManagerTasks",
+                JSON.stringify(userTasks),
+              );
             } catch (error) {
               console.error("Error loading user data:", error);
-              StorageManager.setJSON("taskManagerSettings", {});
-              StorageManager.setJSON("taskManagerTasks", []);
+              localStorage.setItem("taskManagerSettings", JSON.stringify({}));
+              localStorage.setItem("taskManagerTasks", JSON.stringify([]));
             }
 
             // Clear the planner shown flag so it shows on fresh login
-            StorageManager.removeItem("plannerShownForSession");
+            localStorage.removeItem("plannerShownForSession");
 
             // Redirect to home page
             navigate("/");
@@ -249,7 +238,7 @@ const LoginPage = () => {
 
         // Add user to users list
         users.push(newUser);
-        StorageManager.setJSON("taskManagerUsers", users);
+        localStorage.setItem("taskManagerUsers", JSON.stringify(users));
       } catch (error) {
         console.error("Error checking username:", error);
         setError("An error occurred during registration. Please try again.");
@@ -259,27 +248,34 @@ const LoginPage = () => {
 
       // Store user info in localStorage for current session
       try {
-        StorageManager.setJSON("taskManagerUser", {
-          id: userId,
-          username,
-        });
+        // Direct localStorage save (most reliable)
+        localStorage.setItem(
+          "taskManagerUser",
+          JSON.stringify({
+            id: userId,
+            username,
+          }),
+        );
+
+        // Also try StorageManager as backup
+        try {
+          StorageManager.setJSON("taskManagerUser", {
+            id: userId,
+            username,
+          });
+        } catch (storageManagerError) {
+          console.log(
+            "StorageManager failed but direct localStorage worked",
+            storageManagerError,
+          );
+        }
       } catch (error) {
         console.error("Error storing user data:", error);
-        // Fallback to direct localStorage
-        try {
-          localStorage.setItem(
-            "taskManagerUser",
-            JSON.stringify({
-              id: userId,
-              username,
-            }),
-          );
-        } catch (fallbackError) {
-          console.error("Fallback storage also failed:", fallbackError);
-          alert("Unable to store user data. Please try again.");
-          setLoading(false);
-          return;
-        }
+        alert(
+          "Unable to store user data. Please try again or check your browser settings.",
+        );
+        setLoading(false);
+        return;
       }
 
       // Set default settings for new user
@@ -300,15 +296,21 @@ const LoginPage = () => {
       };
 
       // Save settings both for current session and user-specific storage
-      StorageManager.setJSON("taskManagerSettings", defaultSettings);
-      StorageManager.setJSON(`taskManagerSettings_${userId}`, defaultSettings);
+      localStorage.setItem(
+        "taskManagerSettings",
+        JSON.stringify(defaultSettings),
+      );
+      localStorage.setItem(
+        `taskManagerSettings_${userId}`,
+        JSON.stringify(defaultSettings),
+      );
 
       // Create empty tasks array for new user
-      StorageManager.setJSON("taskManagerTasks", []);
-      StorageManager.setJSON(`taskManagerTasks_${userId}`, []);
+      localStorage.setItem("taskManagerTasks", JSON.stringify([]));
+      localStorage.setItem(`taskManagerTasks_${userId}`, JSON.stringify([]));
 
       // Clear the planner shown flag so it shows on fresh login
-      StorageManager.removeItem("plannerShownForSession");
+      localStorage.removeItem("plannerShownForSession");
 
       // Redirect to home page
       navigate("/");
