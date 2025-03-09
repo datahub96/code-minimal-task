@@ -154,22 +154,33 @@ const DailyPlannerWithSupabase: React.FC<DailyPlannerProps> = ({
     };
 
     try {
-      // First try to save to Supabase if available
-      if (supabase && userId) {
-        const { error: upsertError } = await supabase
-          .from("daily_planner")
-          .upsert({
-            user_id: userId,
-            date: dateKey,
-            daily_goal: dailyGoal,
-            plan_items: planItems,
-            notes: notes,
-            updated_at: new Date().toISOString(),
-          });
+      // Try to use the database module first
+      try {
+        if (userId) {
+          const { saveDailyPlan } = await import("@/lib/database");
+          await saveDailyPlan(userId, dateKey, dataToSave);
+          console.log("Daily plan saved to database");
+        }
+      } catch (dbError) {
+        console.error("Error saving to database module:", dbError);
 
-        if (upsertError) {
-          console.error("Supabase error saving planner:", upsertError);
-          throw upsertError;
+        // Fall back to direct Supabase call
+        if (supabase && userId) {
+          const { error: upsertError } = await supabase
+            .from("daily_planner")
+            .upsert({
+              user_id: userId,
+              date: dateKey,
+              daily_goal: dailyGoal,
+              plan_items: planItems,
+              notes: notes,
+              updated_at: new Date().toISOString(),
+            });
+
+          if (upsertError) {
+            console.error("Supabase error saving planner:", upsertError);
+            throw upsertError;
+          }
         }
       }
 

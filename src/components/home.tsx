@@ -123,30 +123,82 @@ const Home = () => {
     }
   }, []);
 
-  // Load user settings and tasks from localStorage when component mounts
+  // Load user settings and tasks when component mounts
   useEffect(() => {
-    // Get current user
-    try {
-      const userJson = StorageManager.getItem("taskManagerUser");
-      if (userJson) {
-        const user = JSON.parse(userJson);
-        setCurrentUser(user);
+    // Import database functions
+    const loadData = async () => {
+      try {
+        // Get current user
+        const userJson = StorageManager.getItem("taskManagerUser");
+        if (userJson) {
+          const user = JSON.parse(userJson);
+          setCurrentUser(user);
 
-        // Show planner on login if enabled and this is a fresh login
-        const hasShownPlanner = StorageManager.getItem(
-          "plannerShownForSession",
-        );
-        if (showPlannerOnLogin && !hasShownPlanner) {
-          setIsPlannerOpen(true);
-          // Mark that we've shown the planner for this session
-          StorageManager.setItem("plannerShownForSession", "true");
+          // Show planner on login if enabled and this is a fresh login
+          const hasShownPlanner = StorageManager.getItem(
+            "plannerShownForSession",
+          );
+          if (showPlannerOnLogin && !hasShownPlanner) {
+            setIsPlannerOpen(true);
+            // Mark that we've shown the planner for this session
+            StorageManager.setItem("plannerShownForSession", "true");
+          }
+
+          // Try to load from database first
+          try {
+            const { getTasks, getCategories } = await import("@/lib/database");
+
+            // Load categories/settings
+            const categories = await getCategories(user.id);
+            if (categories && categories.length > 0) {
+              // Update settings with categories from database
+              const updatedSettings = {
+                ...userSettings,
+                categories: categories,
+              };
+              setUserSettings(updatedSettings);
+
+              // Save to localStorage as backup
+              StorageManager.setJSON("taskManagerSettings", updatedSettings);
+            } else {
+              // Load from localStorage as fallback
+              loadSettingsFromLocalStorage();
+            }
+
+            // Load tasks
+            const tasks = await getTasks(user.id);
+            if (tasks && tasks.length > 0) {
+              // Load all tasks but only show non-completed tasks by default
+              const activeTasks = tasks.filter((task) => !task.completed);
+              setTasks(activeTasks);
+              console.log("Loaded tasks from database:", activeTasks.length);
+
+              // Save to localStorage as backup
+              StorageManager.setJSON("taskManagerTasks", tasks);
+            } else {
+              // Load from localStorage as fallback
+              loadTasksFromLocalStorage();
+            }
+          } catch (dbError) {
+            console.error("Error loading from database:", dbError);
+            // Fall back to localStorage
+            loadSettingsFromLocalStorage();
+            loadTasksFromLocalStorage();
+          }
         }
+      } catch (error) {
+        console.error("Error loading user data:", error);
+        // Fall back to localStorage
+        loadSettingsFromLocalStorage();
+        loadTasksFromLocalStorage();
       }
+    };
 
-      // Load settings
-      const savedSettings = StorageManager.getItem("taskManagerSettings");
-      if (savedSettings) {
-        try {
+    // Helper function to load settings from localStorage
+    const loadSettingsFromLocalStorage = () => {
+      try {
+        const savedSettings = StorageManager.getItem("taskManagerSettings");
+        if (savedSettings) {
           const parsedSettings = JSON.parse(savedSettings);
           setUserSettings(parsedSettings);
 
@@ -169,15 +221,17 @@ const Home = () => {
           if (parsedSettings.showPlannerOnLogin !== undefined) {
             setShowPlannerOnLogin(parsedSettings.showPlannerOnLogin);
           }
-        } catch (error) {
-          console.error("Error parsing settings:", error);
         }
+      } catch (error) {
+        console.error("Error parsing settings:", error);
       }
+    };
 
-      // Load tasks
-      const savedTasks = StorageManager.getItem("taskManagerTasks");
-      if (savedTasks) {
-        try {
+    // Helper function to load tasks from localStorage
+    const loadTasksFromLocalStorage = () => {
+      try {
+        const savedTasks = StorageManager.getItem("taskManagerTasks");
+        if (savedTasks) {
           const parsedTasks = JSON.parse(savedTasks);
           // Convert ISO date strings back to Date objects
           const tasksWithDates = parsedTasks.map((task: any) => ({
@@ -189,17 +243,17 @@ const Home = () => {
           const activeTasks = tasksWithDates.filter((task) => !task.completed);
           setTasks(activeTasks);
           console.log("Loaded tasks from localStorage:", activeTasks.length);
-        } catch (error) {
-          console.error("Error parsing tasks:", error);
+        } else {
+          console.log("No tasks found in localStorage");
           setTasks([]);
         }
-      } else {
-        console.log("No tasks found in localStorage");
+      } catch (error) {
+        console.error("Error parsing tasks:", error);
         setTasks([]);
       }
-    } catch (error) {
-      console.error("Error loading user data:", error);
-    }
+    };
+
+    loadData();
   }, []);
 
   // Handle view toggle
@@ -255,22 +309,49 @@ const Home = () => {
       allTasks = [...tasks]; // Fallback to current state
     }
 
-    // Update the task completion status
+    // Find the task to update
+    const taskToUpdate = allTasks.find((task) => task.id === taskId);
+    if (!taskToUpdate) {
+      console.error("Task not found:", taskId);
+      return;
+    }
+
+    // If completing a task with a running timer, stop the timer and calculate final time
+    let finalTimeSpent = taskToUpdate.timeSpent || 0;
+    if (taskToUpdate.timerStarted && !taskToUpdate.completed) {
+      const now = Date.now();
+      finalTimeSpent += now - taskToUpdate.timerStarted;
+    }
+
+    // Create updated task object
+    const updatedTaskData = {
+      completed: !taskToUpdate.completed,
+      timerStarted: undefined, // Stop the timer when completing
+      timeSpent: finalTimeSpent,
+      completedAt: !taskToUpdate.completed
+        ? new Date().toISOString()
+        : undefined,
+      userId: currentUser?.id,
+    };
+
+    // Try to update in database first
+    try {
+      if (currentUser) {
+        const { updateTask } = await import("@/lib/database");
+        await updateTask(taskId, updatedTaskData);
+        console.log("Task completion status updated in database");
+      }
+    } catch (dbError) {
+      console.error("Error updating task completion in database:", dbError);
+      // Continue with local update even if database update fails
+    }
+
+    // Update the task completion status in local state
     const updatedTasks = allTasks.map((task) => {
       if (task.id === taskId) {
-        // If completing a task with a running timer, stop the timer and calculate final time
-        let finalTimeSpent = task.timeSpent || 0;
-        if (task.timerStarted && !task.completed) {
-          const now = Date.now();
-          finalTimeSpent += now - task.timerStarted;
-        }
-
         return {
           ...task,
-          completed: !task.completed,
-          timerStarted: undefined, // Stop the timer when completing
-          timeSpent: finalTimeSpent,
-          completedAt: !task.completed ? new Date().toISOString() : undefined,
+          ...updatedTaskData,
         };
       }
       return task;
@@ -387,6 +468,19 @@ const Home = () => {
   const confirmTaskDelete = async () => {
     if (deleteTaskId) {
       try {
+        // Try to delete from database first
+        try {
+          if (currentUser) {
+            const { deleteTask } = await import("@/lib/database");
+            await deleteTask(deleteTaskId, currentUser.id);
+            console.log("Task deleted from database");
+          }
+        } catch (dbError) {
+          console.error("Error deleting task from database:", dbError);
+          // Continue with local deletion even if database deletion fails
+        }
+
+        // Update local state
         const updatedTasks = tasks.filter((task) => task.id !== deleteTaskId);
         setTasks(updatedTasks);
         saveTasksToLocalStorage(updatedTasks);
@@ -432,6 +526,9 @@ const Home = () => {
     let updatedTasks;
 
     try {
+      // Import database functions
+      const { updateTask, createTask } = await import("@/lib/database");
+
       if (editingTask) {
         // Update existing task
         const updatedTask = {
@@ -446,8 +543,21 @@ const Home = () => {
             : undefined,
           timeSpent: data.timeSpent,
           expectedTime: data.expectedTime,
+          userId: currentUser?.id, // Add user ID for database operations
         };
 
+        // Try to update in database first
+        try {
+          if (currentUser) {
+            await updateTask(editingTask.id, updatedTask);
+            console.log("Task updated in database");
+          }
+        } catch (dbError) {
+          console.error("Error updating task in database:", dbError);
+          // Continue with local update even if database update fails
+        }
+
+        // Update local state
         updatedTasks = tasks.map((task) =>
           task.id === editingTask.id ? { ...task, ...updatedTask } : task,
         );
@@ -456,7 +566,7 @@ const Home = () => {
       } else {
         // Add new task
         const newTask: Task = {
-          id: Date.now().toString(), // Generate a unique ID
+          id: Date.now().toString(), // Generate a unique ID (will be replaced by DB if successful)
           title: data.title,
           description: data.description,
           deadline: data.deadline,
@@ -471,13 +581,31 @@ const Home = () => {
           expectedTime: data.expectedTime || 3600000, // Default 1 hour if not specified
         };
 
+        // Try to create in database first
+        try {
+          if (currentUser) {
+            const dbTask = await createTask({
+              ...newTask,
+              userId: currentUser.id,
+            });
+            console.log("Task created in database", dbTask);
+            // Use the database-generated ID if available
+            if (dbTask && dbTask.id) {
+              newTask.id = dbTask.id;
+            }
+          }
+        } catch (dbError) {
+          console.error("Error creating task in database:", dbError);
+          // Continue with local creation even if database creation fails
+        }
+
         updatedTasks = [...tasks, newTask];
       }
 
-      // Update state first
+      // Update state
       setTasks(updatedTasks);
 
-      // Save directly to localStorage first (most reliable method)
+      // Save to localStorage as backup
       try {
         const tasksForStorage = updatedTasks.map((task) => ({
           ...task,

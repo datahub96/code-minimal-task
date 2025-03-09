@@ -19,7 +19,7 @@ export async function registerUser(userData: {
     const { data: existingUsers, error: checkError } = await supabase
       .from("users")
       .select("*")
-      .or(`username.eq.${userData.username},email.eq.${userData.email}`);
+      .or(`username.eq."${userData.username}",email.eq."${userData.email}"`);
 
     if (checkError) throw checkError;
 
