@@ -204,21 +204,36 @@ export async function createTask(taskData) {
 
       // Also save to localStorage as backup
       try {
+        // Get all existing tasks
         const localTasks = JSON.parse(
           localStorage.getItem(`taskManagerTasks_${taskData.userId}`) || "[]",
         );
-        localTasks.push({
-          ...data[0],
+
+        // Create a properly formatted task object for local storage
+        const localTask = {
           id: data[0].id,
-          category: taskData.category, // Keep the category object for local use
+          title: data[0].title,
+          description: data[0].description || "",
           deadline: data[0].deadline, // Keep the ISO string
+          category: taskData.category, // Keep the category object for local use
+          completed: data[0].completed || false,
+          timerStarted: data[0].timer_started,
+          timeSpent: data[0].time_spent || 0,
+          expectedTime: data[0].expected_time || 3600000,
           createdAt: data[0].created_at,
-        });
+        };
+
+        // Add to local tasks array
+        localTasks.push(localTask);
+
+        // Save to both user-specific and general storage
         localStorage.setItem(
           `taskManagerTasks_${taskData.userId}`,
           JSON.stringify(localTasks),
         );
         localStorage.setItem("taskManagerTasks", JSON.stringify(localTasks));
+
+        console.log("Task also saved to localStorage:", localTask.id);
       } catch (localError) {
         console.warn("Could not save task to localStorage:", localError);
       }

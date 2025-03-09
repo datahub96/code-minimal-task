@@ -163,12 +163,14 @@ const DailyPlanner: React.FC<DailyPlannerProps> = ({
           nextDay.setDate(nextDay.getDate() + 1);
 
           return {
-            id: `planner-${item.id}`,
+            id: `planner-${item.id}-${Date.now()}`, // Ensure unique ID
             title: item.text,
             description: `Added from daily planner (${format(date, "MMM d, yyyy")})`,
             deadline: nextDay,
             category: { name: "Daily Plan", color: "#8b5cf6" }, // Purple color for planner tasks
             completed: false,
+            createdAt: new Date().toISOString(), // Add creation timestamp
+            expectedTime: 3600000, // Default 1 hour
           };
         });
 

@@ -594,7 +594,6 @@ const Home = () => {
         console.log("New task object created:", newTask);
 
         // Try to create in database first
-        let dbTaskCreated = false;
         try {
           if (currentUser) {
             console.log(
@@ -609,7 +608,6 @@ const Home = () => {
             // Use the database-generated ID if available
             if (dbTask && dbTask.id) {
               newTask.id = dbTask.id;
-              dbTaskCreated = true;
             }
           }
         } catch (dbError) {
@@ -617,13 +615,9 @@ const Home = () => {
           // Continue with local creation even if database creation fails
         }
 
-        // Only add to local state if not already added via database
-        if (!dbTaskCreated) {
-          updatedTasks = [...tasks, newTask];
-          console.log("Updated tasks array with new task", updatedTasks.length);
-        } else {
-          updatedTasks = [...tasks];
-        }
+        // Always add to local state
+        updatedTasks = [...tasks, newTask];
+        console.log("Updated tasks array with new task", updatedTasks.length);
       }
 
       // Update state
@@ -828,10 +822,46 @@ const Home = () => {
   const showCompleted = urlParams.get("status") === "Completed";
 
   // Handle adding tasks from daily planner
-  const handleAddTasksFromPlanner = (tasksToAdd: any[]) => {
-    const updatedTasks = [...tasks, ...tasksToAdd];
+  const handleAddTasksFromPlanner = async (tasksToAdd: any[]) => {
+    console.log("Adding tasks from planner:", tasksToAdd);
+    const newTasks = [];
+
+    // Process each task from the planner
+    for (const taskToAdd of tasksToAdd) {
+      try {
+        // Try to save to database first
+        if (currentUser) {
+          const { createTask } = await import("@/lib/database");
+          const dbTask = await createTask({
+            ...taskToAdd,
+            userId: currentUser.id,
+          });
+
+          if (dbTask && dbTask.id) {
+            // Use the database ID if available
+            newTasks.push({
+              ...taskToAdd,
+              id: dbTask.id,
+            });
+            console.log("Planner task saved to database:", dbTask.id);
+          } else {
+            newTasks.push(taskToAdd);
+          }
+        } else {
+          newTasks.push(taskToAdd);
+        }
+      } catch (error) {
+        console.error("Error saving planner task to database:", error);
+        // Add the task anyway even if database save fails
+        newTasks.push(taskToAdd);
+      }
+    }
+
+    // Update state with all tasks
+    const updatedTasks = [...tasks, ...newTasks];
     setTasks(updatedTasks);
     saveTasksToLocalStorage(updatedTasks);
+    console.log("Updated tasks with planner items:", updatedTasks.length);
   };
 
   return (
