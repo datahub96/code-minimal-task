@@ -114,59 +114,89 @@ export async function getTasks(userId) {
 }
 
 export async function createTask(taskData) {
+  console.log("createTask function called with data:", taskData);
+
   if (useSupabase) {
     try {
+      console.log("Using Supabase to create task");
       // First, ensure the category exists
       let categoryId = null;
 
       if (taskData.category) {
+        console.log("Processing category:", taskData.category.name);
         // Check if category exists
-        const { data: existingCategory } = await supabase
-          .from("categories")
-          .select("id")
-          .eq("name", taskData.category.name)
-          .eq("user_id", taskData.userId)
-          .single();
+        try {
+          const { data: existingCategory, error: categoryQueryError } =
+            await supabase
+              .from("categories")
+              .select("id")
+              .eq("name", taskData.category.name)
+              .eq("user_id", taskData.userId);
 
-        if (existingCategory) {
-          categoryId = existingCategory.id;
-        } else {
-          // Create new category
-          const { data: newCategory, error: categoryError } = await supabase
-            .from("categories")
-            .insert({
-              name: taskData.category.name,
-              color: taskData.category.color,
-              user_id: taskData.userId,
-            })
-            .select()
-            .single();
+          if (categoryQueryError) {
+            console.error("Error querying category:", categoryQueryError);
+            throw categoryQueryError;
+          }
 
-          if (categoryError) throw categoryError;
-          categoryId = newCategory.id;
+          if (existingCategory && existingCategory.length > 0) {
+            categoryId = existingCategory[0].id;
+            console.log("Found existing category with ID:", categoryId);
+          } else {
+            console.log("Category not found, creating new one");
+            // Create new category
+            const { data: newCategory, error: categoryError } = await supabase
+              .from("categories")
+              .insert({
+                name: taskData.category.name,
+                color: taskData.category.color,
+                user_id: taskData.userId,
+              })
+              .select();
+
+            if (categoryError) {
+              console.error("Error creating category:", categoryError);
+              throw categoryError;
+            }
+
+            if (newCategory && newCategory.length > 0) {
+              categoryId = newCategory[0].id;
+              console.log("Created new category with ID:", categoryId);
+            }
+          }
+        } catch (categoryError) {
+          console.error("Error handling category:", categoryError);
+          // Continue without category if there's an error
         }
       }
 
       // Now create the task
+      console.log("Creating task with category_id:", categoryId);
+      const taskToInsert = {
+        title: taskData.title,
+        description: taskData.description || "",
+        deadline: taskData.deadline?.toISOString(),
+        category_id: categoryId,
+        completed: taskData.completed || false,
+        timer_started: taskData.timerStarted,
+        time_spent: taskData.timeSpent || 0,
+        expected_time: taskData.expectedTime || 3600000,
+        user_id: taskData.userId,
+        created_at: new Date().toISOString(),
+      };
+
+      console.log("Inserting task into database:", taskToInsert);
       const { data, error } = await supabase
         .from("tasks")
-        .insert({
-          title: taskData.title,
-          description: taskData.description,
-          deadline: taskData.deadline?.toISOString(),
-          category_id: categoryId,
-          completed: taskData.completed || false,
-          timer_started: taskData.timerStarted,
-          time_spent: taskData.timeSpent || 0,
-          expected_time: taskData.expectedTime || 3600000,
-          user_id: taskData.userId,
-          created_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
+        .insert(taskToInsert)
+        .select();
 
-      if (error) throw error;
-      return data;
+      if (error) {
+        console.error("Error inserting task:", error);
+        throw error;
+      }
+
+      console.log("Task created successfully in Supabase:", data);
+      return data[0]; // Return the first task created
     } catch (error) {
       console.error("Error creating task in Supabase:", error);
       // Fall back to localStorage
@@ -175,13 +205,14 @@ export async function createTask(taskData) {
 
   // localStorage fallback
   try {
+    console.log("Using localStorage fallback to create task");
     const tasks = JSON.parse(
       localStorage.getItem(`taskManagerTasks_${taskData.userId}`) || "[]",
     );
     const newTask = {
       id: `task-${Date.now()}`,
       title: taskData.title,
-      description: taskData.description,
+      description: taskData.description || "",
       deadline: taskData.deadline?.toISOString(),
       category: taskData.category,
       completed: taskData.completed || false,
@@ -195,6 +226,7 @@ export async function createTask(taskData) {
       `taskManagerTasks_${taskData.userId}`,
       JSON.stringify(tasks),
     );
+    console.log("Task created successfully in localStorage:", newTask);
     return newTask;
   } catch (error) {
     console.error("Error creating task in localStorage:", error);

@@ -9,7 +9,166 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      categories: {
+        Row: {
+          color: string
+          created_at: string | null
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          color: string
+          created_at?: string | null
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          color?: string
+          created_at?: string | null
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "categories_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      daily_planner: {
+        Row: {
+          created_at: string | null
+          daily_goal: string | null
+          date: string
+          id: string
+          notes: string | null
+          plan_items: Json | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          daily_goal?: string | null
+          date: string
+          id?: string
+          notes?: string | null
+          plan_items?: Json | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          daily_goal?: string | null
+          date?: string
+          id?: string
+          notes?: string | null
+          plan_items?: Json | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_planner_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tasks: {
+        Row: {
+          category_id: string | null
+          completed: boolean | null
+          completed_at: string | null
+          created_at: string | null
+          deadline: string | null
+          description: string | null
+          expected_time: number | null
+          id: string
+          time_spent: number | null
+          timer_started: number | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          category_id?: string | null
+          completed?: boolean | null
+          completed_at?: string | null
+          created_at?: string | null
+          deadline?: string | null
+          description?: string | null
+          expected_time?: number | null
+          id?: string
+          time_spent?: number | null
+          timer_started?: number | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          category_id?: string | null
+          completed?: boolean | null
+          completed_at?: string | null
+          created_at?: string | null
+          deadline?: string | null
+          description?: string | null
+          expected_time?: number | null
+          id?: string
+          time_spent?: number | null
+          timer_started?: number | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      users: {
+        Row: {
+          auth_id: string | null
+          created_at: string | null
+          email: string
+          id: string
+          last_login: string | null
+          username: string
+        }
+        Insert: {
+          auth_id?: string | null
+          created_at?: string | null
+          email: string
+          id?: string
+          last_login?: string | null
+          username: string
+        }
+        Update: {
+          auth_id?: string | null
+          created_at?: string | null
+          email?: string
+          id?: string
+          last_login?: string | null
+          username?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

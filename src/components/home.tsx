@@ -523,13 +523,22 @@ const Home = () => {
   };
 
   const handleTaskFormSubmit = async (data: any) => {
+    console.log("Task form submitted with data:", data);
     let updatedTasks;
 
     try {
+      // Validate required fields
+      if (!data.title || data.title.trim() === "") {
+        console.error("Task title is required");
+        alert("Task title is required");
+        return;
+      }
+
       // Import database functions
       const { updateTask, createTask } = await import("@/lib/database");
 
       if (editingTask) {
+        console.log("Updating existing task:", editingTask.id);
         // Update existing task
         const updatedTask = {
           title: data.title,
@@ -564,11 +573,12 @@ const Home = () => {
 
         setEditingTask(null);
       } else {
+        console.log("Creating new task");
         // Add new task
         const newTask: Task = {
           id: Date.now().toString(), // Generate a unique ID (will be replaced by DB if successful)
           title: data.title,
-          description: data.description,
+          description: data.description || "",
           deadline: data.deadline,
           category: data.category
             ? {
@@ -581,9 +591,15 @@ const Home = () => {
           expectedTime: data.expectedTime || 3600000, // Default 1 hour if not specified
         };
 
+        console.log("New task object created:", newTask);
+
         // Try to create in database first
         try {
           if (currentUser) {
+            console.log(
+              "Attempting to save task to database for user:",
+              currentUser.id,
+            );
             const dbTask = await createTask({
               ...newTask,
               userId: currentUser.id,
@@ -600,10 +616,12 @@ const Home = () => {
         }
 
         updatedTasks = [...tasks, newTask];
+        console.log("Updated tasks array with new task", updatedTasks.length);
       }
 
       // Update state
       setTasks(updatedTasks);
+      console.log("State updated with new tasks");
 
       // Save to localStorage as backup
       try {
@@ -636,10 +654,11 @@ const Home = () => {
 
       // Close the form regardless
       setIsTaskFormOpen(false);
+      console.log("Task form closed");
     } catch (error) {
       console.error("Error in task form submission:", error);
       console.error("Error creating task");
-      // Don't show alert - we'll use the toast notification system instead
+      alert("There was an error creating the task. Please try again.");
     }
   };
 

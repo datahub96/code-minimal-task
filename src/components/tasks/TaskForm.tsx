@@ -99,17 +99,25 @@ const TaskForm: React.FC<ExtendedTaskFormProps> = ({
   });
 
   const handleSubmit = (data: TaskFormValues) => {
+    console.log("TaskForm handleSubmit called with data:", data);
+    // Validate required fields
+    if (!data.title || data.title.trim() === "") {
+      alert("Task title is required");
+      return;
+    }
+
     // Include the selected date in the form data
     const formData = {
       ...data,
       deadline: date,
     };
 
+    console.log("Submitting form data:", formData);
     try {
       onSubmit(formData);
     } catch (error) {
       console.error("Error submitting task form:", error);
-      // Continue anyway - the error will be handled by the parent component
+      alert("There was an error creating the task. Please try again.");
     }
   };
 
