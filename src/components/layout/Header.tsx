@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { supabase } from "@/lib/supabase";
 import { StorageManager } from "@/components/storage/StorageManager";
 import { Button } from "../ui/button";
 import { Switch } from "../ui/switch";
@@ -73,13 +74,21 @@ const Header = ({
 
   const handleLogout = async () => {
     try {
-      // Import the logout function from supabase-auth
-      const { logoutUser } = await import("@/lib/supabase-auth");
-      await logoutUser();
+      if (supabase) {
+        // Sign out from Supabase
+        await supabase.auth.signOut();
+      }
+
+      // Always clear local storage
+      localStorage.removeItem("taskManagerUser");
+      StorageManager.removeItem("taskManagerUser");
+
+      // Redirect to login page
       navigate("/login");
     } catch (error) {
       console.error("Error during logout:", error);
-      // Fallback to simple removal if the import fails
+      // Fallback to simple removal
+      localStorage.removeItem("taskManagerUser");
       StorageManager.removeItem("taskManagerUser");
       navigate("/login");
     }

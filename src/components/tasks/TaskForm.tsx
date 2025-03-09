@@ -104,7 +104,13 @@ const TaskForm: React.FC<ExtendedTaskFormProps> = ({
       ...data,
       deadline: date,
     };
-    onSubmit(formData);
+
+    try {
+      onSubmit(formData);
+    } catch (error) {
+      console.error("Error submitting task form:", error);
+      // Continue anyway - the error will be handled by the parent component
+    }
   };
 
   return (

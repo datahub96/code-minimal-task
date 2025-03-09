@@ -104,12 +104,8 @@ export async function loginUser(credentials: {
       .update({ last_login: new Date().toISOString() })
       .eq("auth_id", authData.user?.id);
 
-    // Store user data in local storage for app use
-    StorageManager.setJSON("taskManagerUser", {
-      id: userData.id,
-      username: userData.username,
-      email: userData.email,
-    });
+    // We'll return the user data and let the component handle storage
+    // This prevents issues with the storage not being updated properly
 
     return { user: userData, session: authData.session };
   } catch (error: any) {

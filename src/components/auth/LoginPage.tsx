@@ -146,7 +146,25 @@ const LoginPage = () => {
           try {
             // For login we use email instead of username
             const loginEmail = email || username; // Use email if provided, otherwise try username as email
-            await loginUser({ email: loginEmail, password });
+            const result = await loginUser({ email: loginEmail, password });
+
+            // Store user data in localStorage for app use
+            StorageManager.setJSON("taskManagerUser", {
+              id: result.user.id,
+              username: result.user.username,
+              email: result.user.email,
+            });
+
+            // Also store in regular localStorage as backup
+            localStorage.setItem(
+              "taskManagerUser",
+              JSON.stringify({
+                id: result.user.id,
+                username: result.user.username,
+                email: result.user.email,
+              }),
+            );
+
             navigate("/");
           } catch (error: any) {
             console.error("Supabase login error:", error);

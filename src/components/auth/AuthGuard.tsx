@@ -18,13 +18,16 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
         // Check Supabase auth if available
         if (supabase) {
           const { data } = await supabase.auth.getSession();
-          setIsAuthenticated(!!data.session);
-          setIsLoading(false);
-          return;
+          if (data.session) {
+            setIsAuthenticated(true);
+            setIsLoading(false);
+            return;
+          }
         }
 
         // Fallback to localStorage
-        setIsAuthenticated(StorageManager.getItem("taskManagerUser") !== null);
+        const userJson = StorageManager.getItem("taskManagerUser");
+        setIsAuthenticated(userJson !== null);
       } catch (error) {
         console.error("Error checking authentication:", error);
         setIsAuthenticated(false);
@@ -34,7 +37,7 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
     };
 
     checkAuth();
-  }, []);
+  }, [location.pathname]);
 
   // Show loading state
   if (isLoading) {
