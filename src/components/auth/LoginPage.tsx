@@ -56,12 +56,16 @@ const LoginPage = () => {
           // First check if localStorage is available
           if (!StorageManager.isLocalStorageAvailable()) {
             // Import error codes
-            const { logError, ErrorCodes } = require("@/lib/errorCodes");
-            logError(
-              ErrorCodes.STORAGE_NOT_AVAILABLE,
-              new Error("Local storage is not available"),
-              { method: "handleLogin", username },
-            );
+            try {
+              const { logError, ErrorCodes } = require("@/lib/errorCodes");
+              logError(
+                ErrorCodes.STORAGE_NOT_AVAILABLE,
+                new Error("Local storage is not available"),
+                { method: "handleLogin", username },
+              );
+            } catch (e) {
+              console.error("Error importing error codes:", e);
+            }
             throw new Error("Local storage is not available in your browser");
           }
 
@@ -69,12 +73,16 @@ const LoginPage = () => {
 
           if (!success) {
             // Import error codes
-            const { logError, ErrorCodes } = require("@/lib/errorCodes");
-            logError(
-              ErrorCodes.AUTH_LOGIN_FAILED,
-              new Error("Failed to save user data"),
-              { method: "handleLogin", username },
-            );
+            try {
+              const { logError, ErrorCodes } = require("@/lib/errorCodes");
+              logError(
+                ErrorCodes.AUTH_LOGIN_FAILED,
+                new Error("Failed to save user data"),
+                { method: "handleLogin", username },
+              );
+            } catch (e) {
+              console.error("Error importing error codes:", e);
+            }
             throw new Error("Failed to save user data");
           }
         } catch (error) {

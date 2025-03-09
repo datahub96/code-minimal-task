@@ -25,10 +25,14 @@ export class StorageManager {
       return testValue === testKey;
     } catch (e) {
       // Import here to avoid circular dependency
-      const { logError, ErrorCodes } = require("@/lib/errorCodes");
-      logError(ErrorCodes.STORAGE_NOT_AVAILABLE, e, {
-        method: "isLocalStorageAvailable",
-      });
+      try {
+        const { logError, ErrorCodes } = require("@/lib/errorCodes");
+        logError(ErrorCodes.STORAGE_NOT_AVAILABLE, e, {
+          method: "isLocalStorageAvailable",
+        });
+      } catch (importError) {
+        console.error("Error importing error codes:", importError);
+      }
       console.warn("localStorage test failed:", e);
       return false;
     }
@@ -45,11 +49,15 @@ export class StorageManager {
       return localStorage.getItem(key);
     } catch (error) {
       // Import here to avoid circular dependency
-      const { logError, ErrorCodes } = require("@/lib/errorCodes");
-      logError(ErrorCodes.STORAGE_READ_FAILED, error, {
-        method: "getItem",
-        key,
-      });
+      try {
+        const { logError, ErrorCodes } = require("@/lib/errorCodes");
+        logError(ErrorCodes.STORAGE_READ_FAILED, error, {
+          method: "getItem",
+          key,
+        });
+      } catch (importError) {
+        console.error("Error importing error codes:", importError);
+      }
       console.error(`Error getting item ${key} from localStorage:`, error);
       return null;
     }
@@ -69,36 +77,44 @@ export class StorageManager {
       const savedValue = localStorage.getItem(key);
       if (savedValue !== value) {
         // Import here to avoid circular dependency
-        const { logError, ErrorCodes } = require("@/lib/errorCodes");
-        logError(
-          ErrorCodes.STORAGE_VERIFICATION_FAILED,
-          new Error("Storage verification failed"),
-          { method: "setItem", key },
-        );
+        try {
+          const { logError, ErrorCodes } = require("@/lib/errorCodes");
+          logError(
+            ErrorCodes.STORAGE_VERIFICATION_FAILED,
+            new Error("Storage verification failed"),
+            { method: "setItem", key },
+          );
+        } catch (importError) {
+          console.error("Error importing error codes:", importError);
+        }
         console.error(`Storage verification failed for key ${key}`);
         return false;
       }
       return true;
     } catch (error) {
       // Import here to avoid circular dependency
-      const { logError, ErrorCodes } = require("@/lib/errorCodes");
+      try {
+        const { logError, ErrorCodes } = require("@/lib/errorCodes");
 
-      // Check if it's a quota exceeded error
-      if (
-        error instanceof DOMException &&
-        (error.code === 22 ||
-          error.code === 1014 ||
-          error.name === "QuotaExceededError")
-      ) {
-        logError(ErrorCodes.STORAGE_QUOTA_EXCEEDED, error, {
-          method: "setItem",
-          key,
-        });
-      } else {
-        logError(ErrorCodes.STORAGE_WRITE_FAILED, error, {
-          method: "setItem",
-          key,
-        });
+        // Check if it's a quota exceeded error
+        if (
+          error instanceof DOMException &&
+          (error.code === 22 ||
+            error.code === 1014 ||
+            error.name === "QuotaExceededError")
+        ) {
+          logError(ErrorCodes.STORAGE_QUOTA_EXCEEDED, error, {
+            method: "setItem",
+            key,
+          });
+        } else {
+          logError(ErrorCodes.STORAGE_WRITE_FAILED, error, {
+            method: "setItem",
+            key,
+          });
+        }
+      } catch (importError) {
+        console.error("Error importing error codes:", importError);
       }
 
       console.error(`Error setting item ${key} in localStorage:`, error);

@@ -342,15 +342,19 @@ const Home = () => {
 
       if (!success) {
         // Import error codes
-        const { logError, ErrorCodes } = require("@/lib/errorCodes");
-        logError(
-          ErrorCodes.STORAGE_WRITE_FAILED,
-          new Error("Failed to save tasks"),
-          {
-            tasksCount: tasksForStorage.length,
-            userId: currentUser?.id,
-          },
-        );
+        try {
+          const { logError, ErrorCodes } = require("@/lib/errorCodes");
+          logError(
+            ErrorCodes.STORAGE_WRITE_FAILED,
+            new Error("Failed to save tasks"),
+            {
+              tasksCount: tasksForStorage.length,
+              userId: currentUser?.id,
+            },
+          );
+        } catch (importError) {
+          console.error("Error importing error codes:", importError);
+        }
         console.error("Failed to save tasks to localStorage");
       } else {
         console.log(
@@ -359,12 +363,16 @@ const Home = () => {
       }
     } catch (error) {
       // Import error codes
-      const { logError, ErrorCodes } = require("@/lib/errorCodes");
-      logError(ErrorCodes.TASK_UPDATE_FAILED, error, {
-        method: "saveTasksToLocalStorage",
-        tasksCount: tasksToSave.length,
-        userId: currentUser?.id,
-      });
+      try {
+        const { logError, ErrorCodes } = require("@/lib/errorCodes");
+        logError(ErrorCodes.TASK_UPDATE_FAILED, error, {
+          method: "saveTasksToLocalStorage",
+          tasksCount: tasksToSave.length,
+          userId: currentUser?.id,
+        });
+      } catch (importError) {
+        console.error("Error importing error codes:", importError);
+      }
       console.error("Error saving tasks to localStorage:", error);
     }
   };
@@ -390,10 +398,15 @@ const Home = () => {
         setDeleteTaskId(null);
       } catch (error) {
         // Import error codes
-        const { logError, ErrorCodes } = require("@/lib/errorCodes");
-        const errorCode = logError(ErrorCodes.TASK_DELETE_FAILED, error, {
-          taskId: deleteTaskId,
-        });
+        let errorCode = "UNKNOWN";
+        try {
+          const { logError, ErrorCodes } = require("@/lib/errorCodes");
+          errorCode = logError(ErrorCodes.TASK_DELETE_FAILED, error, {
+            taskId: deleteTaskId,
+          });
+        } catch (importError) {
+          console.error("Error importing error codes:", importError);
+        }
         console.error("Error deleting task:", error);
         alert(
           `There was an error deleting the task. Please try again. (Error code: ${errorCode})`,

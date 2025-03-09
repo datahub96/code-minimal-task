@@ -78,12 +78,23 @@ const Header = ({
 
   const handleSubmitFeedback = () => {
     if (feedbackText.trim()) {
-      // Import error codes
-      const {
-        logError,
-        ErrorCodes,
-        getErrorLogs,
-      } = require("@/lib/errorCodes");
+      // Import error codes with try-catch to handle potential import issues
+      let logError, ErrorCodes, getErrorLogs;
+      try {
+        const errorModule = require("@/lib/errorCodes");
+        logError = errorModule.logError;
+        ErrorCodes = errorModule.ErrorCodes;
+        getErrorLogs = errorModule.getErrorLogs;
+      } catch (importError) {
+        console.error("Error importing error codes:", importError);
+        // Create fallback functions
+        logError = (code, error, details) => {
+          console.error(`[${code}] Error:`, error, details);
+          return code;
+        };
+        ErrorCodes = { UI_FORM_VALIDATION_FAILED: "TM-UI-504" };
+        getErrorLogs = () => [];
+      }
 
       // Log error report to database
       const errorReport = {

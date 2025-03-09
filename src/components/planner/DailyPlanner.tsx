@@ -13,6 +13,33 @@ import {
 import { CalendarIcon, Plus, Save, Trash2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
+// Import StorageManager with a try-catch to handle potential import issues
+let StorageManager;
+try {
+  StorageManager =
+    require("@/components/storage/StorageManager").StorageManager;
+} catch (e) {
+  console.error("Error importing StorageManager:", e);
+  // Fallback implementation if import fails
+  StorageManager = {
+    getItem: (key) => {
+      try {
+        return localStorage.getItem(key);
+      } catch (e) {
+        return null;
+      }
+    },
+    setJSON: (key, value) => {
+      try {
+        localStorage.setItem(key, JSON.stringify(value));
+        return true;
+      } catch (e) {
+        return false;
+      }
+    },
+  };
+}
+
 interface DailyPlannerProps {
   onClose?: () => void;
   onAddTasks?: (tasks: any[]) => void;
@@ -96,7 +123,36 @@ const DailyPlanner: React.FC<DailyPlannerProps> = ({
         planItems,
         notes,
       };
-      StorageManager.setJSON(`dailyPlanner_${dateKey}`, dataToSave);
+
+      // First try direct localStorage as a fallback
+      let saveSuccess = false;
+      try {
+        if (StorageManager) {
+          saveSuccess = StorageManager.setJSON(
+            `dailyPlanner_${dateKey}`,
+            dataToSave,
+          );
+        } else {
+          localStorage.setItem(
+            `dailyPlanner_${dateKey}`,
+            JSON.stringify(dataToSave),
+          );
+          saveSuccess = true;
+        }
+      } catch (storageError) {
+        console.error("Primary storage method failed:", storageError);
+        // Try alternative storage method
+        try {
+          localStorage.setItem(
+            `dailyPlanner_${dateKey}`,
+            JSON.stringify(dataToSave),
+          );
+          saveSuccess = true;
+        } catch (fallbackError) {
+          console.error("Fallback storage method also failed:", fallbackError);
+          throw fallbackError;
+        }
+      }
 
       // Convert plan items to tasks and add them to the task list
       const tasksToAdd = planItems
