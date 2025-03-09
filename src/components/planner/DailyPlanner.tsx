@@ -186,20 +186,20 @@ const DailyPlanner: React.FC<DailyPlannerProps> = ({
   };
 
   return (
-    <Card className="w-full max-w-4xl mx-auto bg-white dark:bg-gray-800 shadow-lg rounded-lg overflow-hidden">
-      <CardHeader className="border-b border-gray-200 dark:border-gray-700 p-3 md:p-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
-          <CardTitle className="text-lg md:text-2xl font-semibold">
+    <Card className="w-full max-w-md mx-auto bg-white dark:bg-gray-800 shadow-lg rounded-lg overflow-hidden">
+      <CardHeader className="border-b border-gray-200 dark:border-gray-700 p-2">
+        <div className="flex justify-between items-center">
+          <CardTitle className="text-base font-semibold">
             Daily Planner
           </CardTitle>
           <Popover>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
-                className="w-full sm:w-[240px] justify-start text-left font-normal text-xs md:text-sm"
+                className="w-[180px] justify-start text-left font-normal text-xs h-8"
               >
-                <CalendarIcon className="mr-2 h-3 w-3 md:h-4 md:w-4" />
-                {format(date, "PPP")}
+                <CalendarIcon className="mr-2 h-3 w-3" />
+                {format(date, "MMM d, yyyy")}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
@@ -214,97 +214,95 @@ const DailyPlanner: React.FC<DailyPlannerProps> = ({
         </div>
       </CardHeader>
 
-      <CardContent className="p-3 md:p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-          <div className="space-y-4">
-            <div>
-              <h3 className="text-lg font-medium mb-2">Today's Main Goal</h3>
-              <Input
-                placeholder="What's your main focus for today?"
-                value={dailyGoal}
-                onChange={(e) => setDailyGoal(e.target.value)}
-                className="w-full"
-              />
-            </div>
-
-            <div>
-              <h3 className="text-lg font-medium mb-2">Today's Plan</h3>
-              <div className="flex space-x-2 mb-4">
-                <Input
-                  placeholder="Add a task to your plan"
-                  value={newItemText}
-                  onChange={(e) => setNewItemText(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleAddItem()}
-                  className="flex-1"
-                />
-                <Button onClick={handleAddItem}>
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-
-              <ScrollArea className="h-[200px] rounded border p-2">
-                <div className="space-y-2">
-                  {planItems.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-4">
-                      No items added yet. Add some tasks to plan your day!
-                    </p>
-                  ) : (
-                    planItems.map((item) => (
-                      <div
-                        key={item.id}
-                        className="flex items-center justify-between p-2 rounded bg-gray-50 dark:bg-gray-700"
-                      >
-                        <div className="flex items-center space-x-2 flex-1">
-                          <input
-                            type="checkbox"
-                            checked={item.completed}
-                            onChange={() => handleToggleComplete(item.id)}
-                            className="h-4 w-4 rounded border-gray-300"
-                          />
-                          <span
-                            className={
-                              item.completed
-                                ? "line-through text-muted-foreground"
-                                : ""
-                            }
-                          >
-                            {item.text}
-                          </span>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveItem(item.id)}
-                          className="h-8 w-8 p-0"
-                        >
-                          <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
-                        </Button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </ScrollArea>
-            </div>
+      <CardContent className="p-2 overflow-auto max-h-[85vh]">
+        <div className="space-y-3">
+          <div>
+            <h3 className="text-sm font-medium mb-1">Today's Main Goal</h3>
+            <Input
+              placeholder="What's your main focus for today?"
+              value={dailyGoal}
+              onChange={(e) => setDailyGoal(e.target.value)}
+              className="w-full h-8 text-sm"
+            />
           </div>
 
           <div>
-            <h3 className="text-lg font-medium mb-2">Notes & Thoughts</h3>
+            <h3 className="text-sm font-medium mb-1">Today's Plan</h3>
+            <div className="flex space-x-2 mb-2">
+              <Input
+                placeholder="Add a task to your plan"
+                value={newItemText}
+                onChange={(e) => setNewItemText(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAddItem()}
+                className="flex-1 h-8 text-sm"
+              />
+              <Button onClick={handleAddItem} size="sm" className="h-8 w-8 p-0">
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <ScrollArea className="h-[120px] rounded border p-1">
+              <div className="space-y-1">
+                {planItems.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-2 text-xs">
+                    No items added yet. Add some tasks to plan your day!
+                  </p>
+                ) : (
+                  planItems.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex items-center justify-between p-1 rounded bg-gray-50 dark:bg-gray-700"
+                    >
+                      <div className="flex items-center space-x-2 flex-1">
+                        <input
+                          type="checkbox"
+                          checked={item.completed}
+                          onChange={() => handleToggleComplete(item.id)}
+                          className="h-3 w-3 rounded border-gray-300"
+                        />
+                        <span
+                          className={`text-xs ${
+                            item.completed
+                              ? "line-through text-muted-foreground"
+                              : ""
+                          }`}
+                        >
+                          {item.text}
+                        </span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemoveItem(item.id)}
+                        className="h-6 w-6 p-0"
+                      >
+                        <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
+          </div>
+
+          <div>
+            <h3 className="text-sm font-medium mb-1">Notes & Thoughts</h3>
             <Textarea
               placeholder="Any additional notes, thoughts or ideas for today..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="min-h-[250px] w-full"
+              className="min-h-[100px] w-full text-sm"
             />
           </div>
         </div>
 
-        <div className="flex justify-end space-x-2 mt-6">
-          <Button variant="outline" onClick={onClose}>
+        <div className="flex justify-end space-x-2 mt-3">
+          <Button variant="outline" onClick={onClose} size="sm">
             Cancel
           </Button>
-          <Button onClick={handleSave}>
-            <Save className="mr-2 h-4 w-4" />
-            Save & Add Tasks
+          <Button onClick={handleSave} size="sm">
+            <Save className="mr-1 h-3 w-3" />
+            Save
           </Button>
         </div>
       </CardContent>

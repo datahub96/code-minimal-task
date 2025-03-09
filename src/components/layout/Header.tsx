@@ -217,24 +217,7 @@ const Header = ({
             </Tooltip>
           </TooltipProvider>
 
-          {/* Error Logs Button */}
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsErrorLogOpen(true)}
-                  className="h-10 w-10 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
-                >
-                  <AlertTriangle className="h-5 w-5 md:h-6 md:w-6 text-amber-500" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>View Error Logs</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          {/* Error Logs Button - Hidden */}
 
           {/* Settings Button */}
           <TooltipProvider>

@@ -96,16 +96,16 @@ const CalendarView: React.FC<CalendarViewProps> = ({
 
     return (
       <div className="flex flex-col">
-        <div className="text-base font-semibold mb-4 text-center">
+        <div className="text-xs font-semibold mb-2 text-center">
           {format(month, "MMMM yyyy")}
         </div>
 
         {/* Days of week header */}
-        <div className="grid grid-cols-7 mb-1">
+        <div className="grid grid-cols-7 mb-0.5">
           {weekDays.map((day, index) => (
             <div
               key={index}
-              className="text-center text-xs font-medium text-gray-500 py-1"
+              className="text-center text-[10px] font-medium text-gray-500 py-0.5"
             >
               {day}
             </div>
@@ -130,22 +130,22 @@ const CalendarView: React.FC<CalendarViewProps> = ({
               <button
                 key={day.toString()}
                 onClick={() => handleDateSelect(day)}
-                className={`h-10 p-1 relative flex flex-col items-center justify-center rounded-md transition-colors ${isCurrentDay ? "bg-primary/10 font-bold" : ""} ${isSelected ? "ring-2 ring-primary" : ""} hover:bg-gray-100 dark:hover:bg-gray-800`}
+                className={`h-8 p-0.5 relative flex flex-col items-center justify-center rounded-md transition-colors ${isCurrentDay ? "bg-primary/10 font-bold" : ""} ${isSelected ? "ring-1 ring-primary" : ""} hover:bg-gray-100 dark:hover:bg-gray-800`}
               >
                 <span
-                  className={`text-sm ${isCurrentDay ? "text-primary" : ""}`}
+                  className={`text-xs ${isCurrentDay ? "text-primary" : ""}`}
                 >
                   {format(day, "d")}
                 </span>
 
                 {/* Task indicators */}
                 {(hasIncompleteTasks || hasCompletedTasks) && (
-                  <div className="flex gap-0.5 mt-0.5">
+                  <div className="flex gap-0.5">
                     {hasIncompleteTasks && (
-                      <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                      <div className="h-1 w-1 rounded-full bg-blue-500" />
                     )}
                     {hasCompletedTasks && (
-                      <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                      <div className="h-1 w-1 rounded-full bg-green-500" />
                     )}
                   </div>
                 )}
@@ -160,23 +160,33 @@ const CalendarView: React.FC<CalendarViewProps> = ({
   return (
     <div className="flex flex-col h-full bg-white dark:bg-gray-900 rounded-lg overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b">
-        <div className="flex items-center gap-2">
-          <CalendarIcon className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold">Calendar View</h2>
+      <div className="flex items-center justify-between p-2 border-b">
+        <div className="flex items-center gap-1">
+          <CalendarIcon className="h-4 w-4 text-primary" />
+          <h2 className="text-sm font-semibold">Calendar View</h2>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handlePreviousMonth}>
-            <ChevronLeft className="h-4 w-4" />
+        <div className="flex items-center gap-1">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handlePreviousMonth}
+            className="h-7 w-7"
+          >
+            <ChevronLeft className="h-3 w-3" />
           </Button>
 
-          <span className="text-sm font-medium">
+          <span className="text-xs font-medium">
             {format(currentMonth, "MMM yyyy")} - {format(nextMonth, "MMM yyyy")}
           </span>
 
-          <Button variant="outline" size="sm" onClick={handleNextMonth}>
-            <ChevronRight className="h-4 w-4" />
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleNextMonth}
+            className="h-7 w-7"
+          >
+            <ChevronRight className="h-3 w-3" />
           </Button>
         </div>
       </div>
@@ -200,18 +210,18 @@ const CalendarView: React.FC<CalendarViewProps> = ({
         {/* Selected day tasks */}
         <div className="lg:col-span-2 p-2 md:p-4 overflow-auto bg-gray-50 dark:bg-gray-800">
           <Card className="border-0 shadow-none bg-transparent">
-            <CardHeader className="px-0 pt-0 pb-3 border-b">
+            <CardHeader className="px-0 pt-0 pb-2 border-b">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base font-semibold">
+                <CardTitle className="text-xs font-semibold">
                   {format(selectedDate, "MMMM d, yyyy")}
                 </CardTitle>
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-8 w-8 p-0 rounded-full"
+                  className="h-6 w-6 p-0 rounded-full"
                   onClick={() => onAddTask(selectedDate)}
                 >
-                  <Plus className="h-4 w-4" />
+                  <Plus className="h-3 w-3" />
                 </Button>
               </div>
             </CardHeader>
