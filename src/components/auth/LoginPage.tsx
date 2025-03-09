@@ -53,22 +53,28 @@ const LoginPage = () => {
             username,
           };
 
-          // Direct localStorage save (most reliable)
-          localStorage.setItem("taskManagerUser", JSON.stringify(userData));
+          // Try StorageManager first (which now has memory fallback)
+          const storageSuccess = StorageManager.setJSON(
+            "taskManagerUser",
+            userData,
+          );
 
-          // Also try StorageManager as backup
-          try {
-            StorageManager.setJSON("taskManagerUser", userData);
-          } catch (storageManagerError) {
-            console.log(
-              "StorageManager failed but direct localStorage worked",
-              storageManagerError,
-            );
+          if (!storageSuccess) {
+            // As a last resort, try direct localStorage
+            try {
+              localStorage.setItem("taskManagerUser", JSON.stringify(userData));
+            } catch (directStorageError) {
+              console.error(
+                "Both StorageManager and direct localStorage failed",
+                directStorageError,
+              );
+              // Continue anyway - we'll use memory storage as fallback
+            }
           }
         } catch (error) {
           console.error("Error storing user data:", error);
           setError(
-            `Unable to store user data. Please check your browser settings and ensure cookies/local storage are enabled.`,
+            `Unable to store user data in browser storage. The app will continue to work, but your data may not persist between sessions.`,
           );
           setLoading(false);
           return;

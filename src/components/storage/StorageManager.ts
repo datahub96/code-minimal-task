@@ -11,23 +11,40 @@ export class StorageManager {
     }
 
     try {
-      // Simplified check that's less likely to fail
-      return !!window.localStorage;
+      // More robust check for localStorage availability
+      const testKey = "__storage_test__";
+      localStorage.setItem(testKey, testKey);
+      const result = localStorage.getItem(testKey) === testKey;
+      localStorage.removeItem(testKey);
+      return result;
     } catch (e) {
       console.warn("localStorage test failed:", e);
       return false;
     }
   }
 
-  // Get data from localStorage with error handling
+  // Get data from localStorage with error handling and memory fallback
   static getItem(key: string): string | null {
     if (typeof window === "undefined") {
-      console.warn("Window is not available, cannot get item");
-      return null;
+      console.warn(
+        "Window is not available, cannot get item from localStorage",
+      );
+      // Return from memory fallback in non-browser environments
+      return this.memoryStorage[key] || null;
     }
 
     try {
-      return localStorage.getItem(key);
+      // Try localStorage first if available
+      if (this.isLocalStorageAvailable()) {
+        const value = localStorage.getItem(key);
+        return value;
+      } else {
+        // Use memory fallback if localStorage is not available
+        console.warn(
+          `Using memory fallback to get key ${key} as localStorage is unavailable`,
+        );
+        return this.memoryStorage[key] || null;
+      }
     } catch (error) {
       // Import here to avoid circular dependency
       try {
@@ -40,40 +57,45 @@ export class StorageManager {
         console.error("Error importing error codes:", importError);
       }
       console.error(`Error getting item ${key} from localStorage:`, error);
-      return null;
+
+      // Try memory fallback
+      console.warn(`Falling back to memory storage for getting key ${key}`);
+      return this.memoryStorage[key] || null;
     }
   }
 
-  // Set data in localStorage with error handling and verification
+  // Memory fallback storage when localStorage is unavailable
+  private static memoryStorage: Record<string, string> = {};
+
+  // Set data in localStorage with error handling, verification, and memory fallback
   static setItem(key: string, value: string): boolean {
     if (typeof window === "undefined") {
       console.warn("Window is not available, cannot set item");
-      return false;
+      // Use memory fallback in non-browser environments
+      this.memoryStorage[key] = value;
+      return true;
     }
 
     try {
-      localStorage.setItem(key, value);
+      // Try to use localStorage first
+      if (this.isLocalStorageAvailable()) {
+        localStorage.setItem(key, value);
 
-      // Verify data was saved correctly
-      const savedValue = localStorage.getItem(key);
-      if (savedValue !== value) {
-        // Import here to avoid circular dependency
-        try {
-          const { logError, ErrorCodes } = require("@/lib/errorCodes");
-          logError(
-            ErrorCodes.STORAGE_VERIFICATION_FAILED,
-            new Error("Storage verification failed"),
-            { method: "setItem", key },
-          );
-        } catch (importError) {
-          console.error("Error importing error codes:", importError);
+        // Verify data was saved correctly
+        const savedValue = localStorage.getItem(key);
+        if (savedValue !== value) {
+          throw new Error("Storage verification failed");
         }
-        console.error(`Storage verification failed for key ${key}`);
-        return false;
+      } else {
+        // Use memory fallback if localStorage is not available
+        this.memoryStorage[key] = value;
+        console.warn(
+          `Using memory fallback for key ${key} as localStorage is unavailable`,
+        );
       }
       return true;
     } catch (error) {
-      // Import here to avoid circular dependency
+      // Log the error with error codes if possible
       try {
         const { logError, ErrorCodes } = require("@/lib/errorCodes");
 
@@ -99,7 +121,21 @@ export class StorageManager {
       }
 
       console.error(`Error setting item ${key} in localStorage:`, error);
-      return false;
+
+      // Use memory fallback as last resort
+      try {
+        this.memoryStorage[key] = value;
+        console.warn(
+          `Falling back to memory storage for key ${key} after localStorage error`,
+        );
+        return true;
+      } catch (memoryError) {
+        console.error(
+          `Memory fallback also failed for key ${key}:`,
+          memoryError,
+        );
+        return false;
+      }
     }
   }
 

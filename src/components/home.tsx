@@ -326,39 +326,49 @@ const Home = () => {
         deadline: task.deadline ? task.deadline.toISOString() : undefined,
       }));
 
-      // Direct localStorage save first (most reliable)
-      localStorage.setItem("taskManagerTasks", JSON.stringify(tasksForStorage));
+      // Try StorageManager first (which now has memory fallback)
+      const mainStorageSuccess = StorageManager.setJSON(
+        "taskManagerTasks",
+        tasksForStorage,
+      );
       console.log(
-        `Successfully saved ${tasksForStorage.length} tasks to localStorage`,
+        `${mainStorageSuccess ? "Successfully" : "Attempted to"} save ${tasksForStorage.length} tasks to storage`,
       );
 
       // Save to user-specific storage if user is logged in
       if (currentUser?.id) {
-        localStorage.setItem(
+        StorageManager.setJSON(
           `taskManagerTasks_${currentUser.id}`,
-          JSON.stringify(tasksForStorage),
+          tasksForStorage,
         );
       }
 
-      // Also try StorageManager as backup
-      try {
-        StorageManager.setJSON("taskManagerTasks", tasksForStorage);
-
-        if (currentUser?.id) {
-          StorageManager.setJSON(
-            `taskManagerTasks_${currentUser.id}`,
-            tasksForStorage,
+      // As a last resort, try direct localStorage
+      if (!mainStorageSuccess) {
+        try {
+          localStorage.setItem(
+            "taskManagerTasks",
+            JSON.stringify(tasksForStorage),
           );
+
+          if (currentUser?.id) {
+            localStorage.setItem(
+              `taskManagerTasks_${currentUser.id}`,
+              JSON.stringify(tasksForStorage),
+            );
+          }
+        } catch (directStorageError) {
+          console.error(
+            "Both StorageManager and direct localStorage failed",
+            directStorageError,
+          );
+          // Continue anyway - we'll use memory storage as fallback
         }
-      } catch (storageManagerError) {
-        console.log(
-          "StorageManager failed but direct localStorage worked",
-          storageManagerError,
-        );
       }
     } catch (error) {
       console.error("Error saving tasks to localStorage:", error);
-      alert("There was an error saving your tasks. Please try again.");
+      console.error("Error saving tasks to storage");
+      // Don't show alert - we'll use the toast notification system instead
     }
   };
 
@@ -492,16 +502,16 @@ const Home = () => {
         }
       } catch (error) {
         console.error("Error saving tasks:", error);
-        alert(
-          "Warning: Your tasks may not be saved. Please try again or check your browser settings.",
-        );
+        console.error("Warning: Tasks may not be saved to persistent storage");
+        // Don't show alert - we'll use the toast notification system instead
       }
 
       // Close the form regardless
       setIsTaskFormOpen(false);
     } catch (error) {
       console.error("Error in task form submission:", error);
-      alert("There was an error creating your task. Please try again.");
+      console.error("Error creating task");
+      // Don't show alert - we'll use the toast notification system instead
     }
   };
 
