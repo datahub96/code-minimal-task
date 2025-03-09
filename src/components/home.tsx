@@ -436,51 +436,80 @@ const Home = () => {
   const handleTaskFormSubmit = async (data: any) => {
     let updatedTasks;
 
-    if (editingTask) {
-      // Update existing task
-      const updatedTask = {
-        title: data.title,
-        description: data.description,
-        deadline: data.deadline,
-        category: data.category
-          ? {
-              name: data.category,
-              color: getCategoryColor(data.category),
-            }
-          : undefined,
-        timeSpent: data.timeSpent,
-        expectedTime: data.expectedTime,
-      };
+    try {
+      if (editingTask) {
+        // Update existing task
+        const updatedTask = {
+          title: data.title,
+          description: data.description,
+          deadline: data.deadline,
+          category: data.category
+            ? {
+                name: data.category,
+                color: getCategoryColor(data.category),
+              }
+            : undefined,
+          timeSpent: data.timeSpent,
+          expectedTime: data.expectedTime,
+        };
 
-      updatedTasks = tasks.map((task) =>
-        task.id === editingTask.id ? { ...task, ...updatedTask } : task,
-      );
+        updatedTasks = tasks.map((task) =>
+          task.id === editingTask.id ? { ...task, ...updatedTask } : task,
+        );
 
-      setEditingTask(null);
-    } else {
-      // Add new task
-      const newTask: Task = {
-        id: Date.now().toString(), // Generate a unique ID
-        title: data.title,
-        description: data.description,
-        deadline: data.deadline,
-        category: data.category
-          ? {
-              name: data.category,
-              color: getCategoryColor(data.category),
-            }
-          : undefined,
-        completed: false,
-        createdAt: new Date().toISOString(),
-        expectedTime: data.expectedTime || 3600000, // Default 1 hour if not specified
-      };
+        setEditingTask(null);
+      } else {
+        // Add new task
+        const newTask: Task = {
+          id: Date.now().toString(), // Generate a unique ID
+          title: data.title,
+          description: data.description,
+          deadline: data.deadline,
+          category: data.category
+            ? {
+                name: data.category,
+                color: getCategoryColor(data.category),
+              }
+            : undefined,
+          completed: false,
+          createdAt: new Date().toISOString(),
+          expectedTime: data.expectedTime || 3600000, // Default 1 hour if not specified
+        };
 
-      updatedTasks = [...tasks, newTask];
+        updatedTasks = [...tasks, newTask];
+      }
+
+      setTasks(updatedTasks);
+
+      // Try to save tasks with error handling
+      try {
+        saveTasksToLocalStorage(updatedTasks);
+      } catch (storageError) {
+        console.error("Error saving tasks to storage manager:", storageError);
+        // Fallback to direct localStorage
+        try {
+          const tasksForStorage = updatedTasks.map((task) => ({
+            ...task,
+            deadline: task.deadline ? task.deadline.toISOString() : undefined,
+          }));
+          localStorage.setItem(
+            "taskManagerTasks",
+            JSON.stringify(tasksForStorage),
+          );
+          console.log("Saved tasks using direct localStorage");
+        } catch (fallbackError) {
+          console.error("Fallback storage also failed:", fallbackError);
+          alert(
+            "Warning: Your tasks may not be saved. Please try again or check your browser settings.",
+          );
+        }
+      }
+
+      setIsTaskFormOpen(false);
+    } catch (error) {
+      console.error("Error in task form submission:", error);
+      alert("There was an error creating your task. Please try again.");
     }
-
-    setTasks(updatedTasks);
-    saveTasksToLocalStorage(updatedTasks);
-    setIsTaskFormOpen(false);
   };
 
   // Helper function to get category color

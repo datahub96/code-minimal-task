@@ -258,10 +258,29 @@ const LoginPage = () => {
       }
 
       // Store user info in localStorage for current session
-      StorageManager.setJSON("taskManagerUser", {
-        id: userId,
-        username,
-      });
+      try {
+        StorageManager.setJSON("taskManagerUser", {
+          id: userId,
+          username,
+        });
+      } catch (error) {
+        console.error("Error storing user data:", error);
+        // Fallback to direct localStorage
+        try {
+          localStorage.setItem(
+            "taskManagerUser",
+            JSON.stringify({
+              id: userId,
+              username,
+            }),
+          );
+        } catch (fallbackError) {
+          console.error("Fallback storage also failed:", fallbackError);
+          alert("Unable to store user data. Please try again.");
+          setLoading(false);
+          return;
+        }
+      }
 
       // Set default settings for new user
       const defaultSettings = {

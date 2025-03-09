@@ -40,8 +40,8 @@ export class StorageManager {
 
   // Get data from localStorage with error handling
   static getItem(key: string): string | null {
-    if (!this.isLocalStorageAvailable()) {
-      console.warn("localStorage is not available, cannot get item");
+    if (typeof window === "undefined") {
+      console.warn("Window is not available, cannot get item");
       return null;
     }
 
@@ -65,8 +65,8 @@ export class StorageManager {
 
   // Set data in localStorage with error handling and verification
   static setItem(key: string, value: string): boolean {
-    if (!this.isLocalStorageAvailable()) {
-      console.warn("localStorage is not available, cannot set item");
+    if (typeof window === "undefined") {
+      console.warn("Window is not available, cannot set item");
       return false;
     }
 
@@ -124,8 +124,8 @@ export class StorageManager {
 
   // Remove data from localStorage with error handling
   static removeItem(key: string): boolean {
-    if (!this.isLocalStorageAvailable()) {
-      console.warn("localStorage is not available, cannot remove item");
+    if (typeof window === "undefined") {
+      console.warn("Window is not available, cannot remove item");
       return false;
     }
 
@@ -153,10 +153,25 @@ export class StorageManager {
   static setJSON<T>(key: string, value: T): boolean {
     try {
       const jsonString = JSON.stringify(value);
-      return this.setItem(key, jsonString);
+      const success = this.setItem(key, jsonString);
+
+      if (!success) {
+        // Try direct localStorage as fallback
+        localStorage.setItem(key, jsonString);
+        return true;
+      }
+
+      return success;
     } catch (error) {
       console.error(`Error stringifying JSON for key ${key}:`, error);
-      return false;
+      try {
+        // Last resort fallback
+        localStorage.setItem(key, JSON.stringify(value));
+        return true;
+      } catch (fallbackError) {
+        console.error(`Fallback also failed for key ${key}:`, fallbackError);
+        return false;
+      }
     }
   }
 }
