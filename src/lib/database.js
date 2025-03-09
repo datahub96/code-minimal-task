@@ -195,7 +195,34 @@ export async function createTask(taskData) {
         throw error;
       }
 
+      if (!data || data.length === 0) {
+        console.error("No data returned from task creation");
+        throw new Error("Task was created but no data was returned");
+      }
+
       console.log("Task created successfully in Supabase:", data);
+
+      // Also save to localStorage as backup
+      try {
+        const localTasks = JSON.parse(
+          localStorage.getItem(`taskManagerTasks_${taskData.userId}`) || "[]",
+        );
+        localTasks.push({
+          ...data[0],
+          id: data[0].id,
+          category: taskData.category, // Keep the category object for local use
+          deadline: data[0].deadline, // Keep the ISO string
+          createdAt: data[0].created_at,
+        });
+        localStorage.setItem(
+          `taskManagerTasks_${taskData.userId}`,
+          JSON.stringify(localTasks),
+        );
+        localStorage.setItem("taskManagerTasks", JSON.stringify(localTasks));
+      } catch (localError) {
+        console.warn("Could not save task to localStorage:", localError);
+      }
+
       return data[0]; // Return the first task created
     } catch (error) {
       console.error("Error creating task in Supabase:", error);
@@ -222,10 +249,14 @@ export async function createTask(taskData) {
       createdAt: new Date().toISOString(),
     };
     tasks.push(newTask);
+
+    // Save to both user-specific and general storage
     localStorage.setItem(
       `taskManagerTasks_${taskData.userId}`,
       JSON.stringify(tasks),
     );
+    localStorage.setItem("taskManagerTasks", JSON.stringify(tasks));
+
     console.log("Task created successfully in localStorage:", newTask);
     return newTask;
   } catch (error) {

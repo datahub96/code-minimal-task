@@ -114,7 +114,10 @@ const TaskForm: React.FC<ExtendedTaskFormProps> = ({
 
     console.log("Submitting form data:", formData);
     try {
-      onSubmit(formData);
+      // Wrap in setTimeout to prevent any potential React state update issues
+      setTimeout(() => {
+        onSubmit(formData);
+      }, 0);
     } catch (error) {
       console.error("Error submitting task form:", error);
       alert("There was an error creating the task. Please try again.");

@@ -594,6 +594,7 @@ const Home = () => {
         console.log("New task object created:", newTask);
 
         // Try to create in database first
+        let dbTaskCreated = false;
         try {
           if (currentUser) {
             console.log(
@@ -608,6 +609,7 @@ const Home = () => {
             // Use the database-generated ID if available
             if (dbTask && dbTask.id) {
               newTask.id = dbTask.id;
+              dbTaskCreated = true;
             }
           }
         } catch (dbError) {
@@ -615,8 +617,13 @@ const Home = () => {
           // Continue with local creation even if database creation fails
         }
 
-        updatedTasks = [...tasks, newTask];
-        console.log("Updated tasks array with new task", updatedTasks.length);
+        // Only add to local state if not already added via database
+        if (!dbTaskCreated) {
+          updatedTasks = [...tasks, newTask];
+          console.log("Updated tasks array with new task", updatedTasks.length);
+        } else {
+          updatedTasks = [...tasks];
+        }
       }
 
       // Update state
