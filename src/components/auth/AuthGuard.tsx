@@ -1,6 +1,7 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { StorageManager } from "@/components/storage/StorageManager";
+import { supabase } from "@/lib/supabase";
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -8,16 +9,41 @@ interface AuthGuardProps {
 
 const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
   const location = useLocation();
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Check for authentication with error handling
-  const isAuthenticated = (() => {
-    try {
-      return StorageManager.getItem("taskManagerUser") !== null;
-    } catch (error) {
-      console.error("Error checking authentication:", error);
-      return false;
-    }
-  })();
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        // Check Supabase auth if available
+        if (supabase) {
+          const { data } = await supabase.auth.getSession();
+          setIsAuthenticated(!!data.session);
+          setIsLoading(false);
+          return;
+        }
+
+        // Fallback to localStorage
+        setIsAuthenticated(StorageManager.getItem("taskManagerUser") !== null);
+      } catch (error) {
+        console.error("Error checking authentication:", error);
+        setIsAuthenticated(false);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, []);
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        Loading...
+      </div>
+    );
+  }
 
   // If not authenticated and not on login page, redirect to login
   if (!isAuthenticated && location.pathname !== "/login") {

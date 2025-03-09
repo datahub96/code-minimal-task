@@ -15,6 +15,8 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Lock, User, Mail } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { loginUser, registerUser } from "@/lib/supabase-auth";
+import { supabase } from "@/lib/supabase";
 
 interface UserData {
   username: string;
@@ -36,6 +38,7 @@ const LoginPage = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState("");
   const navigate = useNavigate();
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -138,60 +141,74 @@ const LoginPage = () => {
         // Redirect to home page
         navigate("/");
       } else {
-        // Check if user exists in localStorage
-        try {
-          const users = JSON.parse(
-            localStorage.getItem("taskManagerUsers") || "[]",
-          );
-          const user = users.find(
-            (u: any) => u.username === username && u.password === password,
-          );
-
-          if (user) {
-            // Store user info in localStorage
-            localStorage.setItem(
-              "taskManagerUser",
-              JSON.stringify({
-                id: user.id,
-                username: user.username,
-              }),
+        // Try to login with Supabase if available
+        if (supabase) {
+          try {
+            // For login we use email instead of username
+            const loginEmail = email || username; // Use email if provided, otherwise try username as email
+            await loginUser({ email: loginEmail, password });
+            navigate("/");
+          } catch (error: any) {
+            console.error("Supabase login error:", error);
+            setError(error.message || "Invalid email or password");
+          }
+        } else {
+          // Fallback to localStorage if Supabase is not available
+          try {
+            const users = JSON.parse(
+              localStorage.getItem("taskManagerUsers") || "[]",
+            );
+            const user = users.find(
+              (u: any) => u.username === username && u.password === password,
             );
 
-            // Load user's settings
-            try {
-              const userSettings = JSON.parse(
-                localStorage.getItem(`taskManagerSettings_${user.id}`) || "{}",
-              );
+            if (user) {
+              // Store user info in localStorage
               localStorage.setItem(
-                "taskManagerSettings",
-                JSON.stringify(userSettings),
+                "taskManagerUser",
+                JSON.stringify({
+                  id: user.id,
+                  username: user.username,
+                }),
               );
 
-              // Load user's tasks
-              const userTasks = JSON.parse(
-                localStorage.getItem(`taskManagerTasks_${user.id}`) || "[]",
-              );
-              localStorage.setItem(
-                "taskManagerTasks",
-                JSON.stringify(userTasks),
-              );
-            } catch (error) {
-              console.error("Error loading user data:", error);
-              localStorage.setItem("taskManagerSettings", JSON.stringify({}));
-              localStorage.setItem("taskManagerTasks", JSON.stringify([]));
+              // Load user's settings
+              try {
+                const userSettings = JSON.parse(
+                  localStorage.getItem(`taskManagerSettings_${user.id}`) ||
+                    "{}",
+                );
+                localStorage.setItem(
+                  "taskManagerSettings",
+                  JSON.stringify(userSettings),
+                );
+
+                // Load user's tasks
+                const userTasks = JSON.parse(
+                  localStorage.getItem(`taskManagerTasks_${user.id}`) || "[]",
+                );
+                localStorage.setItem(
+                  "taskManagerTasks",
+                  JSON.stringify(userTasks),
+                );
+              } catch (error) {
+                console.error("Error loading user data:", error);
+                localStorage.setItem("taskManagerSettings", JSON.stringify({}));
+                localStorage.setItem("taskManagerTasks", JSON.stringify([]));
+              }
+
+              // Clear the planner shown flag so it shows on fresh login
+              localStorage.removeItem("plannerShownForSession");
+
+              // Redirect to home page
+              navigate("/");
+            } else {
+              setError("Invalid username or password");
             }
-
-            // Clear the planner shown flag so it shows on fresh login
-            localStorage.removeItem("plannerShownForSession");
-
-            // Redirect to home page
-            navigate("/");
-          } else {
-            setError("Invalid username or password");
+          } catch (error) {
+            console.error("Error checking user credentials:", error);
+            setError("An error occurred during login. Please try again.");
           }
-        } catch (error) {
-          console.error("Error checking user credentials:", error);
-          setError("An error occurred during login. Please try again.");
         }
       }
     } catch (err) {
@@ -205,6 +222,7 @@ const LoginPage = () => {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setSuccess("");
     setLoading(true);
 
     try {
@@ -221,105 +239,123 @@ const LoginPage = () => {
         return;
       }
 
-      // Check if username already exists
-      try {
-        const users = JSON.parse(
-          localStorage.getItem("taskManagerUsers") || "[]",
-        );
-        if (users.some((u: any) => u.username === username)) {
-          setError("Username already exists");
-          setLoading(false);
-          return;
-        }
-
-        // Create new user
-        const userId = `user-${Date.now()}`;
-        const newUser = {
-          id: userId,
-          username,
-          email,
-          password, // In a real app, this would be hashed
-          created_at: new Date().toISOString(),
-        };
-
-        // Add user to users list
-        users.push(newUser);
-        localStorage.setItem("taskManagerUsers", JSON.stringify(users));
-      } catch (error) {
-        console.error("Error checking username:", error);
-        setError("An error occurred during registration. Please try again.");
-        setLoading(false);
-        return;
-      }
-
-      // Store user info in localStorage for current session
-      try {
-        // Direct localStorage save (most reliable)
-        localStorage.setItem(
-          "taskManagerUser",
-          JSON.stringify({
-            id: userId,
-            username,
-          }),
-        );
-
-        // Also try StorageManager as backup
+      // Try to register with Supabase if available
+      if (supabase) {
         try {
-          StorageManager.setJSON("taskManagerUser", {
+          await registerUser({ username, email, password });
+          setSuccess("Account created successfully! You can now log in.");
+          setActiveTab("login");
+          // Clear form
+          setUsername("");
+          setEmail("");
+          setPassword("");
+          setConfirmPassword("");
+        } catch (error: any) {
+          console.error("Supabase registration error:", error);
+          setError(error.message || "Registration failed. Please try again.");
+        }
+      } else {
+        // Fallback to localStorage if Supabase is not available
+        try {
+          const users = JSON.parse(
+            localStorage.getItem("taskManagerUsers") || "[]",
+          );
+          if (users.some((u: any) => u.username === username)) {
+            setError("Username already exists");
+            setLoading(false);
+            return;
+          }
+
+          // Create new user
+          const userId = `user-${Date.now()}`;
+          const newUser = {
             id: userId,
             username,
-          });
-        } catch (storageManagerError) {
-          console.log(
-            "StorageManager failed but direct localStorage worked",
-            storageManagerError,
+            email,
+            password, // In a real app, this would be hashed
+            created_at: new Date().toISOString(),
+          };
+
+          // Add user to users list
+          users.push(newUser);
+          localStorage.setItem("taskManagerUsers", JSON.stringify(users));
+
+          // Store user info in localStorage for current session
+          try {
+            // Direct localStorage save (most reliable)
+            localStorage.setItem(
+              "taskManagerUser",
+              JSON.stringify({
+                id: userId,
+                username,
+              }),
+            );
+
+            // Also try StorageManager as backup
+            try {
+              StorageManager.setJSON("taskManagerUser", {
+                id: userId,
+                username,
+              });
+            } catch (storageManagerError) {
+              console.log(
+                "StorageManager failed but direct localStorage worked",
+                storageManagerError,
+              );
+            }
+          } catch (error) {
+            console.error("Error storing user data:", error);
+            alert(
+              "Unable to store user data. Please try again or check your browser settings.",
+            );
+            setLoading(false);
+            return;
+          }
+
+          // Set default settings for new user
+          const defaultSettings = {
+            darkMode: false,
+            defaultView: "card",
+            notificationsEnabled: true,
+            notificationTime: "30",
+            showPlannerOnLogin: true,
+            categories: [
+              { id: "1", name: "Work", color: "#3b82f6" },
+              { id: "2", name: "Personal", color: "#10b981" },
+              { id: "3", name: "Health", color: "#ef4444" },
+              { id: "4", name: "Errands", color: "#f59e0b" },
+              { id: "5", name: "Learning", color: "#8b5cf6" },
+              { id: "6", name: "Daily Plan", color: "#8b5cf6" },
+            ],
+          };
+
+          // Save settings both for current session and user-specific storage
+          localStorage.setItem(
+            "taskManagerSettings",
+            JSON.stringify(defaultSettings),
           );
+          localStorage.setItem(
+            `taskManagerSettings_${userId}`,
+            JSON.stringify(defaultSettings),
+          );
+
+          // Create empty tasks array for new user
+          localStorage.setItem("taskManagerTasks", JSON.stringify([]));
+          localStorage.setItem(
+            `taskManagerTasks_${userId}`,
+            JSON.stringify([]),
+          );
+
+          // Clear the planner shown flag so it shows on fresh login
+          localStorage.removeItem("plannerShownForSession");
+
+          // Redirect to home page
+          navigate("/");
+        } catch (error) {
+          console.error("Error during registration:", error);
+          setError("An error occurred during registration. Please try again.");
         }
-      } catch (error) {
-        console.error("Error storing user data:", error);
-        alert(
-          "Unable to store user data. Please try again or check your browser settings.",
-        );
-        setLoading(false);
-        return;
       }
-
-      // Set default settings for new user
-      const defaultSettings = {
-        darkMode: false,
-        defaultView: "card",
-        notificationsEnabled: true,
-        notificationTime: "30",
-        showPlannerOnLogin: true,
-        categories: [
-          { id: "1", name: "Work", color: "#3b82f6" },
-          { id: "2", name: "Personal", color: "#10b981" },
-          { id: "3", name: "Health", color: "#ef4444" },
-          { id: "4", name: "Errands", color: "#f59e0b" },
-          { id: "5", name: "Learning", color: "#8b5cf6" },
-          { id: "6", name: "Daily Plan", color: "#8b5cf6" },
-        ],
-      };
-
-      // Save settings both for current session and user-specific storage
-      localStorage.setItem(
-        "taskManagerSettings",
-        JSON.stringify(defaultSettings),
-      );
-      localStorage.setItem(
-        `taskManagerSettings_${userId}`,
-        JSON.stringify(defaultSettings),
-      );
-
-      // Create empty tasks array for new user
-      localStorage.setItem("taskManagerTasks", JSON.stringify([]));
-      localStorage.setItem(`taskManagerTasks_${userId}`, JSON.stringify([]));
-
-      // Clear the planner shown flag so it shows on fresh login
-      localStorage.removeItem("plannerShownForSession");
-
-      // Redirect to home page
-      navigate("/");
     } catch (err) {
       console.error("Registration error:", err);
       setError("An error occurred during registration. Please try again.");
@@ -360,22 +396,42 @@ const LoginPage = () => {
                     <AlertDescription>{error}</AlertDescription>
                   </Alert>
                 )}
-                <div className="space-y-1 md:space-y-2">
-                  <Label htmlFor="username" className="text-sm">
-                    Username
-                  </Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-2.5 h-3.5 w-3.5 md:top-3 md:h-4 md:w-4 text-muted-foreground" />
-                    <Input
-                      id="username"
-                      placeholder="Enter your username"
-                      className="pl-10 h-9 text-sm"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      required
-                    />
+                {supabase ? (
+                  <div className="space-y-1 md:space-y-2">
+                    <Label htmlFor="email" className="text-sm">
+                      Email
+                    </Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-2.5 h-3.5 w-3.5 md:top-3 md:h-4 md:w-4 text-muted-foreground" />
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="Enter your email"
+                        className="pl-10 h-9 text-sm"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                      />
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="space-y-1 md:space-y-2">
+                    <Label htmlFor="username" className="text-sm">
+                      Username
+                    </Label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-2.5 h-3.5 w-3.5 md:top-3 md:h-4 md:w-4 text-muted-foreground" />
+                      <Input
+                        id="username"
+                        placeholder="Enter your username"
+                        className="pl-10 h-9 text-sm"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+                )}
                 <div className="space-y-1 md:space-y-2">
                   <Label htmlFor="password" className="text-sm">
                     Password
@@ -411,6 +467,11 @@ const LoginPage = () => {
                 {error && (
                   <Alert variant="destructive" className="mb-4">
                     <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+                {success && (
+                  <Alert className="mb-4 bg-green-50 border-green-200 text-green-800">
+                    <AlertDescription>{success}</AlertDescription>
                   </Alert>
                 )}
                 <div className="space-y-2">

@@ -71,9 +71,18 @@ const Header = ({
     onViewChange(newView);
   };
 
-  const handleLogout = () => {
-    StorageManager.removeItem("taskManagerUser");
-    navigate("/login");
+  const handleLogout = async () => {
+    try {
+      // Import the logout function from supabase-auth
+      const { logoutUser } = await import("@/lib/supabase-auth");
+      await logoutUser();
+      navigate("/login");
+    } catch (error) {
+      console.error("Error during logout:", error);
+      // Fallback to simple removal if the import fails
+      StorageManager.removeItem("taskManagerUser");
+      navigate("/login");
+    }
   };
 
   const handleSubmitFeedback = () => {
