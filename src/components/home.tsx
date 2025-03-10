@@ -724,6 +724,12 @@ const Home = () => {
     console.log("Filter change:", newFilters);
     // Store the previous filters to check for status changes
     const prevFilters = filters;
+
+    // Force status to Pending if it was previously Completed and now being removed
+    if ((prevFilters as any)?.status === "Completed" && !newFilters.status) {
+      newFilters.status = "Pending";
+    }
+
     setFilters(newFilters);
 
     try {
@@ -864,10 +870,10 @@ const Home = () => {
           filteredTasks = filteredTasks.filter((task) => !task.completed);
           console.log(`Showing ${filteredTasks.length} pending tasks`);
 
-          // Update URL to remove status parameter
+          // Update URL to reflect pending status
           try {
             const url = new URL(window.location.href);
-            url.searchParams.delete("status");
+            url.searchParams.set("status", "Pending");
             window.history.pushState({}, "", url);
           } catch (error) {
             console.error("Error updating URL:", error);
@@ -886,6 +892,24 @@ const Home = () => {
       ) {
         // By default, show only active tasks if not explicitly showing all or completed
         filteredTasks = filteredTasks.filter((task) => !task.completed);
+      }
+
+      // Extra safety check - if we're not explicitly showing completed tasks,
+      // make sure we're only showing pending tasks
+      if (newFilters.status !== "Completed" && newFilters.status !== "All") {
+        const pendingTasksCount = filteredTasks.filter(
+          (task) => !task.completed,
+        ).length;
+        const completedTasksCount = filteredTasks.filter(
+          (task) => task.completed,
+        ).length;
+
+        if (completedTasksCount > 0 && newFilters.status === "Pending") {
+          console.log(
+            `Safety filter: Removing ${completedTasksCount} completed tasks that shouldn't be shown`,
+          );
+          filteredTasks = filteredTasks.filter((task) => !task.completed);
+        }
       }
 
       // Filter by date
@@ -968,6 +992,9 @@ const Home = () => {
     urlParams.get("status") === "Completed" ||
     (filters as any)?.status === "Completed";
 
+  // Force pending tasks if URL explicitly says so
+  const forcePending = urlParams.get("status") === "Pending";
+
   // Ensure filter state is consistent with URL parameters
   useEffect(() => {
     const statusParam = urlParams.get("status");
@@ -976,13 +1003,21 @@ const Home = () => {
       (filters as any)?.status !== "Completed"
     ) {
       handleFilterChange({ status: "Completed" });
+    } else if (
+      statusParam === "Pending" &&
+      (filters as any)?.status !== "Pending"
+    ) {
+      handleFilterChange({ status: "Pending" });
     }
   }, [urlParams.get("status")]);
 
-  // Check URL on initial load to handle direct links to completed tasks
+  // Check URL on initial load to handle direct links to completed or pending tasks
   useEffect(() => {
-    if (urlParams.get("status") === "Completed") {
+    const statusParam = urlParams.get("status");
+    if (statusParam === "Completed") {
       handleFilterChange({ status: "Completed" });
+    } else if (statusParam === "Pending") {
+      handleFilterChange({ status: "Pending" });
     }
   }, []);
 

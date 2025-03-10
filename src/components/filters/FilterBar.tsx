@@ -175,7 +175,7 @@ const FilterBar = ({
   };
 
   const removeFilter = (filter: string) => {
-    const [type] = filter.split(":");
+    const [type, value] = filter.split(":");
 
     setActiveFilters((prev) => prev.filter((f) => f !== filter));
 
@@ -184,18 +184,28 @@ const FilterBar = ({
       setFilters((prev) => ({ ...prev, category: "" }));
       onFilterChange({ ...filters, category: "" });
     } else if (type === "status") {
-      // When removing status filter, explicitly set to Pending and trigger filter change
+      // When removing status filter, ALWAYS explicitly set to Pending and trigger filter change
       const newFilters = { ...filters, status: "Pending" };
       setFilters(newFilters);
+
+      // Force the filter change with Pending status
       onFilterChange(newFilters);
 
       // Update URL to remove status parameter
       try {
         const url = new URL(window.location.href);
         url.searchParams.delete("status");
+        url.searchParams.set("status", "Pending"); // Explicitly set to Pending in URL
         window.history.pushState({}, "", url);
       } catch (error) {
         console.error("Error updating URL:", error);
+      }
+
+      // Force reload tasks with Pending status if we were showing Completed
+      if (value === "Completed") {
+        setTimeout(() => {
+          onFilterChange({ ...filters, status: "Pending" });
+        }, 0);
       }
     } else if (type === "date") {
       setFilters((prev) => ({ ...prev, dateRange: undefined }));
