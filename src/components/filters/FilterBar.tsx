@@ -84,6 +84,21 @@ const FilterBar = ({
     updateActiveFilters("status", value);
     onFilterChange(newFilters); // Always pass filters, even for default "Pending"
 
+    // Force reload all tasks when switching to Completed view
+    if (value === "Completed") {
+      // This will ensure we get all tasks including completed ones
+      const allTasksJson = localStorage.getItem("taskManagerTasks");
+      if (allTasksJson) {
+        try {
+          const allTasks = JSON.parse(allTasksJson);
+          const completedTasks = allTasks.filter((task: any) => task.completed);
+          console.log(`Found ${completedTasks.length} completed tasks`);
+        } catch (error) {
+          console.error("Error parsing tasks:", error);
+        }
+      }
+    }
+
     // Update URL with status parameter for direct linking
     try {
       const url = new URL(window.location.href);

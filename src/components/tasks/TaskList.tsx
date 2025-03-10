@@ -450,9 +450,7 @@ const TaskList = ({
 
   // Determine if we should show completed tasks based on URL parameters or filters
   const urlParams = new URLSearchParams(window.location.search);
-  const showCompleted =
-    urlParams.get("status") === "Completed" ||
-    tasks.some((task) => task.completed && !tasks.some((t) => !t.completed));
+  const showCompleted = urlParams.get("status") === "Completed";
 
   // Always show all tasks, regardless of completion status
   const visibleTasks = tasks;
