@@ -722,6 +722,8 @@ const Home = () => {
   // Handle filter changes
   const handleFilterChange = async (newFilters: any) => {
     console.log("Filter change:", newFilters);
+    // Store the previous filters to check for status changes
+    const prevFilters = filters;
     setFilters(newFilters);
 
     try {
@@ -858,7 +860,9 @@ const Home = () => {
             console.error("Error updating URL:", error);
           }
         } else if (newFilters.status === "Pending") {
+          // Explicitly filter to only show non-completed tasks
           filteredTasks = filteredTasks.filter((task) => !task.completed);
+          console.log(`Showing ${filteredTasks.length} pending tasks`);
 
           // Update URL to remove status parameter
           try {
@@ -877,8 +881,8 @@ const Home = () => {
         // For "All" status, show all tasks (no filtering needed)
       } else if (
         !supabase &&
-        newFilters.status !== "All" &&
-        newFilters.status !== "Completed"
+        (!newFilters.status ||
+          (newFilters.status !== "All" && newFilters.status !== "Completed"))
       ) {
         // By default, show only active tasks if not explicitly showing all or completed
         filteredTasks = filteredTasks.filter((task) => !task.completed);

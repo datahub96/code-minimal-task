@@ -184,8 +184,10 @@ const FilterBar = ({
       setFilters((prev) => ({ ...prev, category: "" }));
       onFilterChange({ ...filters, category: "" });
     } else if (type === "status") {
-      setFilters((prev) => ({ ...prev, status: "Pending" }));
-      onFilterChange({ ...filters, status: "Pending" });
+      // When removing status filter, explicitly set to Pending and trigger filter change
+      const newFilters = { ...filters, status: "Pending" };
+      setFilters(newFilters);
+      onFilterChange(newFilters);
 
       // Update URL to remove status parameter
       try {
@@ -205,16 +207,18 @@ const FilterBar = ({
   };
 
   const clearAllFilters = () => {
-    setFilters({
+    const newFilters = {
       category: "",
       status: "Pending",
       dateRange: undefined,
       searchTerm: "",
-    });
+    };
+
+    setFilters(newFilters);
     setActiveFilters([]);
-    onFilterChange({
-      status: "Pending",
-    });
+
+    // Explicitly pass the Pending status to ensure tasks are filtered correctly
+    onFilterChange(newFilters);
 
     // Update URL to remove status parameter
     try {
