@@ -118,6 +118,9 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ userId }) => {
                   : undefined,
               }));
 
+              console.log(
+                `Analytics loaded ${processedTasks.length} tasks from database, ${processedTasks.filter((t) => t.completed).length} completed`,
+              );
               setTasks(processedTasks);
               setLoading(false);
               return;
@@ -157,6 +160,9 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ userId }) => {
               : undefined,
           }));
 
+          console.log(
+            `Analytics loaded ${tasksWithDates.length} tasks from localStorage, ${tasksWithDates.filter((t) => t.completed).length} completed`,
+          );
           setTasks(tasksWithDates);
         } catch (error) {
           console.error("Error parsing user data:", error);

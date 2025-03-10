@@ -183,28 +183,48 @@ const FilterBar = ({
     // Reset the corresponding filter
     if (type === "category") {
       setFilters((prev) => ({ ...prev, category: "" }));
-      onFilterChange({});
+      onFilterChange({ ...filters, category: "" });
     } else if (type === "status") {
-      setFilters((prev) => ({ ...prev, status: "" }));
-      onFilterChange({});
+      setFilters((prev) => ({ ...prev, status: "Pending" }));
+      onFilterChange({ ...filters, status: "Pending" });
+
+      // Update URL to remove status parameter
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("status");
+        window.history.pushState({}, "", url);
+      } catch (error) {
+        console.error("Error updating URL:", error);
+      }
     } else if (type === "date") {
       setFilters((prev) => ({ ...prev, dateRange: undefined }));
-      onFilterChange({});
+      onFilterChange({ ...filters, dateRange: undefined });
     } else if (type === "search") {
       setFilters((prev) => ({ ...prev, searchTerm: "" }));
-      onFilterChange({});
+      onFilterChange({ ...filters, searchTerm: "" });
     }
   };
 
   const clearAllFilters = () => {
     setFilters({
       category: "",
-      status: "",
+      status: "Pending",
       dateRange: undefined,
       searchTerm: "",
     });
     setActiveFilters([]);
-    onFilterChange({});
+    onFilterChange({
+      status: "Pending",
+    });
+
+    // Update URL to remove status parameter
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("status");
+      window.history.pushState({}, "", url);
+    } catch (error) {
+      console.error("Error updating URL:", error);
+    }
   };
 
   return (

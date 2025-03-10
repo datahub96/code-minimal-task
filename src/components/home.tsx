@@ -772,6 +772,15 @@ const Home = () => {
         }
       } else if (newFilters.status === "Pending") {
         filteredTasks = filteredTasks.filter((task) => !task.completed);
+
+        // Update URL to remove status parameter
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.delete("status");
+          window.history.pushState({}, "", url);
+        } catch (error) {
+          console.error("Error updating URL:", error);
+        }
       } else if (newFilters.status === "Overdue") {
         const now = new Date();
         filteredTasks = filteredTasks.filter(
