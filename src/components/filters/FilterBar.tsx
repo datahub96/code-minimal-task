@@ -74,10 +74,12 @@ const FilterBar = ({
   };
 
   const handleCategoryChange = (value: string) => {
-    const newFilters = { ...filters, category: value };
+    // Convert "all-categories" to empty string internally
+    const categoryValue = value === "all-categories" ? "" : value;
+    const newFilters = { ...filters, category: categoryValue };
     setFilters(newFilters);
-    updateActiveFilters("category", value);
-    // Always pass the full filters object, even when category is empty (All Categories)
+    updateActiveFilters("category", categoryValue);
+    // Always pass the full filters object
     onFilterChange(newFilters);
   };
 
@@ -125,7 +127,7 @@ const FilterBar = ({
       const url = new URL(window.location.href);
       if (value === "Completed") {
         url.searchParams.set("status", "Completed");
-      } else if (value === "All") {
+      } else if (value === "All" || value === "Pending") {
         url.searchParams.delete("status");
       } else {
         url.searchParams.set("status", value);
@@ -185,6 +187,8 @@ const FilterBar = ({
       // When removing category filter, explicitly set to empty string (all categories)
       const newFilters = { ...filters, category: "" };
       setFilters(newFilters);
+      // Use all-categories value for the select component
+      document.querySelector('[data-value="all-categories"]')?.click();
       onFilterChange(newFilters);
     } else if (type === "status") {
       // When removing status filter, ALWAYS explicitly set to Pending and trigger filter change
@@ -194,11 +198,10 @@ const FilterBar = ({
       // Force the filter change with Pending status
       onFilterChange(newFilters);
 
-      // Update URL to remove status parameter and set to Pending
+      // Update URL to remove status parameter
       try {
         const url = new URL(window.location.href);
         url.searchParams.delete("status");
-        url.searchParams.set("status", "Pending"); // Explicitly set to Pending in URL
         window.history.pushState({}, "", url);
       } catch (error) {
         console.error("Error updating URL:", error);
@@ -268,7 +271,7 @@ const FilterBar = ({
             </div>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">
+            <SelectItem value="all-categories">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-gray-400" />
                 All Categories

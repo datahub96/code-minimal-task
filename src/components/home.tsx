@@ -879,10 +879,10 @@ const Home = () => {
           filteredTasks = filteredTasks.filter((task) => !task.completed);
           console.log(`Showing ${filteredTasks.length} pending tasks`);
 
-          // Update URL to reflect pending status
+          // Remove status from URL for pending tasks (default state)
           try {
             const url = new URL(window.location.href);
-            url.searchParams.set("status", "Pending");
+            url.searchParams.delete("status");
             window.history.pushState({}, "", url);
           } catch (error) {
             console.error("Error updating URL:", error);
@@ -903,11 +903,11 @@ const Home = () => {
         filteredTasks = filteredTasks.filter((task) => !task.completed);
         console.log("Default filter: showing only pending tasks");
 
-        // Make sure URL reflects pending status
+        // Remove status from URL when showing default pending tasks
         try {
           const url = new URL(window.location.href);
-          if (url.searchParams.get("status") !== "Pending") {
-            url.searchParams.set("status", "Pending");
+          if (url.searchParams.has("status")) {
+            url.searchParams.delete("status");
             window.history.pushState({}, "", url);
           }
         } catch (error) {
@@ -1013,15 +1013,16 @@ const Home = () => {
     urlParams.get("status") === "Completed" ||
     (filters as any)?.status === "Completed";
 
-  // Force pending tasks if URL explicitly says so
-  const forcePending = urlParams.get("status") === "Pending";
+  // Default to pending tasks if no status is specified
+  const forcePending =
+    !urlParams.has("status") || urlParams.get("status") === "Pending";
 
   // Check URL on initial load to handle direct links to completed or pending tasks
   useEffect(() => {
     const statusParam = urlParams.get("status");
     if (statusParam === "Completed") {
       handleFilterChange({ status: "Completed" });
-    } else if (statusParam === "Pending") {
+    } else if (!statusParam || statusParam === "Pending") {
       handleFilterChange({ status: "Pending" });
     }
   }, []);
@@ -1035,7 +1036,7 @@ const Home = () => {
     ) {
       handleFilterChange({ status: "Completed" });
     } else if (
-      statusParam === "Pending" &&
+      (!statusParam || statusParam === "Pending") &&
       (filters as any)?.status !== "Pending"
     ) {
       handleFilterChange({ status: "Pending" });
