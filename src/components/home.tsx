@@ -730,6 +730,15 @@ const Home = () => {
       newFilters.status = "Pending";
     }
 
+    // Always ensure status is set to Pending if not explicitly set to something else
+    if (
+      !newFilters.status &&
+      newFilters.status !== "All" &&
+      newFilters.status !== "Completed"
+    ) {
+      newFilters.status = "Pending";
+    }
+
     setFilters(newFilters);
 
     try {
@@ -892,6 +901,18 @@ const Home = () => {
       ) {
         // By default, show only active tasks if not explicitly showing all or completed
         filteredTasks = filteredTasks.filter((task) => !task.completed);
+        console.log("Default filter: showing only pending tasks");
+
+        // Make sure URL reflects pending status
+        try {
+          const url = new URL(window.location.href);
+          if (url.searchParams.get("status") !== "Pending") {
+            url.searchParams.set("status", "Pending");
+            window.history.pushState({}, "", url);
+          }
+        } catch (error) {
+          console.error("Error updating URL:", error);
+        }
       }
 
       // Extra safety check - if we're not explicitly showing completed tasks,
@@ -995,6 +1016,16 @@ const Home = () => {
   // Force pending tasks if URL explicitly says so
   const forcePending = urlParams.get("status") === "Pending";
 
+  // Check URL on initial load to handle direct links to completed or pending tasks
+  useEffect(() => {
+    const statusParam = urlParams.get("status");
+    if (statusParam === "Completed") {
+      handleFilterChange({ status: "Completed" });
+    } else if (statusParam === "Pending") {
+      handleFilterChange({ status: "Pending" });
+    }
+  }, []);
+
   // Ensure filter state is consistent with URL parameters
   useEffect(() => {
     const statusParam = urlParams.get("status");
@@ -1010,16 +1041,6 @@ const Home = () => {
       handleFilterChange({ status: "Pending" });
     }
   }, [urlParams.get("status")]);
-
-  // Check URL on initial load to handle direct links to completed or pending tasks
-  useEffect(() => {
-    const statusParam = urlParams.get("status");
-    if (statusParam === "Completed") {
-      handleFilterChange({ status: "Completed" });
-    } else if (statusParam === "Pending") {
-      handleFilterChange({ status: "Pending" });
-    }
-  }, []);
 
   // Handle adding tasks from daily planner
   const handleAddTasksFromPlanner = async (tasksToAdd: any[]) => {

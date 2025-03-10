@@ -77,7 +77,8 @@ const FilterBar = ({
     const newFilters = { ...filters, category: value };
     setFilters(newFilters);
     updateActiveFilters("category", value);
-    onFilterChange(value ? newFilters : {});
+    // Always pass the full filters object, even when category is empty (All Categories)
+    onFilterChange(newFilters);
   };
 
   const handleStatusChange = async (value: string) => {
@@ -181,8 +182,10 @@ const FilterBar = ({
 
     // Reset the corresponding filter
     if (type === "category") {
-      setFilters((prev) => ({ ...prev, category: "" }));
-      onFilterChange({ ...filters, category: "" });
+      // When removing category filter, explicitly set to empty string (all categories)
+      const newFilters = { ...filters, category: "" };
+      setFilters(newFilters);
+      onFilterChange(newFilters);
     } else if (type === "status") {
       // When removing status filter, ALWAYS explicitly set to Pending and trigger filter change
       const newFilters = { ...filters, status: "Pending" };
@@ -191,7 +194,7 @@ const FilterBar = ({
       // Force the filter change with Pending status
       onFilterChange(newFilters);
 
-      // Update URL to remove status parameter
+      // Update URL to remove status parameter and set to Pending
       try {
         const url = new URL(window.location.href);
         url.searchParams.delete("status");
@@ -265,6 +268,12 @@ const FilterBar = ({
             </div>
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-gray-400" />
+                All Categories
+              </div>
+            </SelectItem>
             {categories.map((category) => (
               <SelectItem key={category.id} value={category.name}>
                 <div className="flex items-center gap-2">
