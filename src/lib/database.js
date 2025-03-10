@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import { StorageManager } from "@/components/storage/StorageManager";
+import { format, isSameDay } from "date-fns";
 
 // Flag to determine if we should use Supabase or localStorage
 const useSupabase = !!supabase;
@@ -63,15 +64,39 @@ export async function getUserByUsername(username) {
 }
 
 // Task functions
-export async function getTasks(userId) {
+export async function getTasks(userId, filters = {}) {
   if (useSupabase) {
     try {
-      const { data, error } = await supabase
+      console.log(
+        `Getting tasks from Supabase for user ${userId} with filters:`,
+        filters,
+      );
+
+      // Start building the query
+      let query = supabase
         .from("tasks")
         .select("*, categories(*)")
         .eq("user_id", userId);
 
+      // Apply filters if provided
+      if (filters.status) {
+        if (filters.status === "Completed") {
+          query = query.eq("completed", true);
+        } else if (filters.status === "Pending") {
+          query = query.eq("completed", false);
+        } else if (filters.status === "Overdue") {
+          const now = new Date().toISOString();
+          query = query.lt("deadline", now).eq("completed", false);
+        }
+        // For "All" status, don't apply any filter
+      }
+
+      // Execute the query
+      const { data, error } = await query;
+
       if (error) throw error;
+
+      console.log(`Retrieved ${data.length} tasks from Supabase`);
 
       // Transform the data to match the app's Task interface
       return data.map((task) => ({
@@ -100,12 +125,20 @@ export async function getTasks(userId) {
 
   // localStorage fallback
   try {
-    // Try user-specific tasks first, then fall back to general tasks
-    let tasksJson = localStorage.getItem(`taskManagerTasks_${userId}`);
+    console.log(`Falling back to localStorage for user ${userId}`);
+    // Try StorageManager first for consistency
+    let tasksJson = StorageManager.getItem(`taskManagerTasks_${userId}`);
 
     // If no user-specific tasks, try the general tasks
     if (!tasksJson) {
-      tasksJson = localStorage.getItem("taskManagerTasks");
+      tasksJson = StorageManager.getItem("taskManagerTasks");
+    }
+
+    // If still no tasks with StorageManager, try direct localStorage
+    if (!tasksJson) {
+      tasksJson =
+        localStorage.getItem(`taskManagerTasks_${userId}`) ||
+        localStorage.getItem("taskManagerTasks");
     }
 
     // If still no tasks, return empty array
@@ -114,10 +147,28 @@ export async function getTasks(userId) {
     }
 
     const tasks = JSON.parse(tasksJson);
-    return tasks.map((task) => ({
+    let filteredTasks = tasks.map((task) => ({
       ...task,
       deadline: task.deadline ? new Date(task.deadline) : undefined,
     }));
+
+    // Apply filters if provided
+    if (filters.status) {
+      if (filters.status === "Completed") {
+        filteredTasks = filteredTasks.filter((task) => task.completed);
+      } else if (filters.status === "Pending") {
+        filteredTasks = filteredTasks.filter((task) => !task.completed);
+      } else if (filters.status === "Overdue") {
+        const now = new Date();
+        filteredTasks = filteredTasks.filter(
+          (task) => !task.completed && task.deadline && task.deadline < now,
+        );
+      }
+      // For "All" status, don't apply any filter
+    }
+
+    console.log(`Retrieved ${filteredTasks.length} tasks from localStorage`);
+    return filteredTasks;
   } catch (error) {
     console.error("Error getting tasks from localStorage:", error);
     return [];

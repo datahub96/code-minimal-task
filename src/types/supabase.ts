@@ -174,7 +174,26 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_filtered_tasks: {
+        Args: {
+          user_id_param: string
+          status_param: string
+        }
+        Returns: {
+          category_id: string | null
+          completed: boolean | null
+          completed_at: string | null
+          created_at: string | null
+          deadline: string | null
+          description: string | null
+          expected_time: number | null
+          id: string
+          time_spent: number | null
+          timer_started: number | null
+          title: string
+          user_id: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

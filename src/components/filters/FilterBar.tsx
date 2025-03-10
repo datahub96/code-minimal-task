@@ -22,6 +22,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { StorageManager } from "@/components/storage/StorageManager";
+import { supabase } from "@/lib/supabase";
 
 interface FilterBarProps {
   onFilterChange?: (filters: FilterState) => void;
@@ -78,45 +80,42 @@ const FilterBar = ({
     onFilterChange(value ? newFilters : {});
   };
 
-  const handleStatusChange = (value: string) => {
+  const handleStatusChange = async (value: string) => {
     const newFilters = { ...filters, status: value };
     setFilters(newFilters);
     updateActiveFilters("status", value);
     onFilterChange(newFilters); // Always pass filters, even for default "Pending"
 
-    // When switching to Completed view, just update the URL without reloading
+    // When switching to Completed view, ensure we load all completed tasks from database
     if (value === "Completed") {
-      // This will ensure we get all tasks including completed ones
-      const userJson = localStorage.getItem("taskManagerUser");
-      let userId = null;
-      if (userJson) {
+      try {
+        // Get current user ID from StorageManager for consistency
+        const userJson = StorageManager.getItem("taskManagerUser");
+        if (!userJson) return;
+
+        const user = JSON.parse(userJson);
+        const userId = user.id;
+
+        // Try to load from database first if available
         try {
-          const user = JSON.parse(userJson);
-          userId = user.id;
-        } catch (error) {
-          console.error("Error parsing user data:", error);
+          if (supabase) {
+            const { data, error } = await supabase
+              .from("tasks")
+              .select("*, categories(*)")
+              .eq("user_id", userId)
+              .eq("completed", true);
+
+            if (error) throw error;
+            console.log(`Found ${data.length} completed tasks in database`);
+          }
+        } catch (dbError) {
+          console.error(
+            "Error loading completed tasks from database:",
+            dbError,
+          );
         }
-      }
-
-      // Try user-specific tasks first, then fall back to general tasks
-      const allTasksJson = userId
-        ? localStorage.getItem(`taskManagerTasks_${userId}`) ||
-          localStorage.getItem("taskManagerTasks")
-        : localStorage.getItem("taskManagerTasks");
-
-      if (allTasksJson) {
-        try {
-          const allTasks = JSON.parse(allTasksJson);
-          const completedTasks = allTasks.filter((task: any) => task.completed);
-          console.log(`Found ${completedTasks.length} completed tasks`);
-
-          // Update URL without reloading the page
-          const url = new URL(window.location.href);
-          url.searchParams.set("status", "Completed");
-          window.history.pushState({}, "", url);
-        } catch (error) {
-          console.error("Error parsing tasks:", error);
-        }
+      } catch (error) {
+        console.error("Error handling completed tasks view:", error);
       }
     }
 

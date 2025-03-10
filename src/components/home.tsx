@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { isSameDay } from "date-fns";
 import { StorageManager } from "@/components/storage/StorageManager";
+import { supabase } from "@/lib/supabase";
 import Header from "./layout/Header";
 import TaskList from "./tasks/TaskList";
 import CalendarView from "./tasks/CalendarView";
@@ -156,6 +157,12 @@ const Home = () => {
             StorageManager.setItem("plannerShownForSession", "true");
           }
 
+          // Check URL parameters for status=Completed
+          const urlParams = new URLSearchParams(window.location.search);
+          const urlStatus = urlParams.get("status");
+          const filterStatus =
+            urlStatus === "Completed" ? "Completed" : "Pending";
+
           // Try to load from database first
           try {
             const { getTasks, getCategories } = await import("@/lib/database");
@@ -177,25 +184,30 @@ const Home = () => {
               loadSettingsFromLocalStorage();
             }
 
-            // Load tasks
-            const tasks = await getTasks(user.id);
+            // Load tasks with appropriate filter
+            const tasks = await getTasks(user.id, { status: filterStatus });
             if (tasks && tasks.length > 0) {
-              // Load all tasks but only show non-completed tasks by default
-              const activeTasks = tasks.filter((task) => !task.completed);
-              setTasks(activeTasks);
-              console.log("Loaded tasks from database:", activeTasks.length);
+              setTasks(tasks);
+              console.log(
+                `Loaded ${tasks.length} ${filterStatus.toLowerCase()} tasks from database`,
+              );
 
               // Save to localStorage as backup
               StorageManager.setJSON("taskManagerTasks", tasks);
+
+              // Also update filters state to match URL
+              if (urlStatus === "Completed") {
+                setFilters({ status: "Completed" });
+              }
             } else {
               // Load from localStorage as fallback
-              loadTasksFromLocalStorage();
+              loadTasksFromLocalStorage(filterStatus);
             }
           } catch (dbError) {
             console.error("Error loading from database:", dbError);
             // Fall back to localStorage
             loadSettingsFromLocalStorage();
-            loadTasksFromLocalStorage();
+            loadTasksFromLocalStorage(filterStatus);
           }
         }
       } catch (error) {
@@ -240,9 +252,17 @@ const Home = () => {
     };
 
     // Helper function to load tasks from localStorage
-    const loadTasksFromLocalStorage = () => {
+    const loadTasksFromLocalStorage = (filterStatus = "Pending") => {
       try {
-        const savedTasks = StorageManager.getItem("taskManagerTasks");
+        // Try user-specific tasks first
+        const userTasksKey = currentUser?.id
+          ? `taskManagerTasks_${currentUser.id}`
+          : "taskManagerTasks";
+
+        const savedTasks =
+          StorageManager.getItem(userTasksKey) ||
+          StorageManager.getItem("taskManagerTasks");
+
         if (savedTasks) {
           const parsedTasks = JSON.parse(savedTasks);
           // Convert ISO date strings back to Date objects
@@ -251,10 +271,24 @@ const Home = () => {
             deadline: task.deadline ? new Date(task.deadline) : undefined,
           }));
 
-          // Load all tasks but only show non-completed tasks by default
-          const activeTasks = tasksWithDates.filter((task) => !task.completed);
-          setTasks(activeTasks);
-          console.log("Loaded tasks from localStorage:", activeTasks.length);
+          // Apply filter based on status
+          let filteredTasks;
+          if (filterStatus === "Completed") {
+            filteredTasks = tasksWithDates.filter((task) => task.completed);
+            console.log(
+              `Loaded ${filteredTasks.length} completed tasks from localStorage`,
+            );
+
+            // Update filters state
+            setFilters({ status: "Completed" });
+          } else {
+            filteredTasks = tasksWithDates.filter((task) => !task.completed);
+            console.log(
+              `Loaded ${filteredTasks.length} pending tasks from localStorage`,
+            );
+          }
+
+          setTasks(filteredTasks);
         } else {
           console.log("No tasks found in localStorage");
           setTasks([]);
@@ -686,139 +720,196 @@ const Home = () => {
   };
 
   // Handle filter changes
-  const handleFilterChange = (newFilters: any) => {
+  const handleFilterChange = async (newFilters: any) => {
     console.log("Filter change:", newFilters);
     setFilters(newFilters);
 
-    // Get all tasks from localStorage (including completed ones)
-    let allTasks = [];
     try {
-      // Try to get user-specific tasks first
-      const userTasksKey = currentUser?.id
-        ? `taskManagerTasks_${currentUser.id}`
-        : "taskManagerTasks";
-      const savedTasks =
-        localStorage.getItem(userTasksKey) ||
-        localStorage.getItem("taskManagerTasks");
-
-      if (savedTasks) {
-        const parsedTasks = JSON.parse(savedTasks);
-        allTasks = parsedTasks.map((task: any) => ({
-          ...task,
-          deadline: task.deadline ? new Date(task.deadline) : undefined,
-        }));
-        console.log(`Loaded ${allTasks.length} total tasks from storage`);
-        console.log(
-          `Of which ${allTasks.filter((t) => t.completed).length} are completed`,
-        );
+      // Check URL parameters for status=Completed
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlStatus = urlParams.get("status");
+      if (urlStatus === "Completed") {
+        // Override filters to show completed tasks
+        newFilters.status = "Completed";
       }
-    } catch (error) {
-      console.error("Error parsing saved tasks:", error);
-      // Fallback to current state if there's an error
-      allTasks = [...tasks];
-    }
 
-    // Check URL parameters for status=Completed
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlStatus = urlParams.get("status");
-    if (urlStatus === "Completed") {
-      // Override filters to show completed tasks
-      newFilters.status = "Completed";
-    }
-
-    // If no filters are applied, show only non-completed tasks by default
-    if (
-      Object.keys(newFilters).length === 0 ||
-      (!newFilters.category &&
-        !newFilters.status &&
-        !newFilters.dateRange &&
-        !newFilters.searchTerm)
-    ) {
-      setTasks(allTasks.filter((task) => !task.completed));
-      return;
-    }
-
-    // Apply filters to tasks
-    let filteredTasks = [...allTasks];
-
-    // Filter by category
-    if (newFilters.category) {
-      // Check if the category still exists in userSettings
-      const categoryExists = userSettings.categories.some(
-        (cat) => cat.name === newFilters.category,
-      );
-
-      if (categoryExists) {
-        filteredTasks = filteredTasks.filter(
-          (task) => task.category?.name === newFilters.category,
-        );
+      // Get user ID for database queries
+      if (!currentUser?.id) {
+        console.error("No user ID available for filtering tasks");
+        return;
       }
-    }
 
-    // Filter by status
-    if (newFilters.status) {
-      if (newFilters.status === "Completed") {
-        // Show completed tasks when explicitly filtered
-        filteredTasks = filteredTasks.filter((task) => task.completed);
-        console.log(`Showing ${filteredTasks.length} completed tasks`);
+      // Try to load from database first if available
+      let allTasks = [];
+      try {
+        if (supabase) {
+          console.log("Loading tasks from Supabase for filtering");
+          let query = supabase
+            .from("tasks")
+            .select("*, categories(*)")
+            .eq("user_id", currentUser.id);
 
-        // Update URL to reflect completed status
-        try {
-          const url = new URL(window.location.href);
-          url.searchParams.set("status", "Completed");
-          window.history.pushState({}, "", url);
-        } catch (error) {
-          console.error("Error updating URL:", error);
+          // Apply database-side filters where possible
+          if (newFilters.status === "Completed") {
+            query = query.eq("completed", true);
+          } else if (newFilters.status === "Pending") {
+            query = query.eq("completed", false);
+          } else if (newFilters.status === "Overdue") {
+            const now = new Date().toISOString();
+            query = query.lt("deadline", now).eq("completed", false);
+          }
+
+          // Execute the query
+          const { data, error } = await query;
+
+          if (error) throw error;
+
+          // Transform the data to match the app's Task interface
+          allTasks = data.map((task) => ({
+            id: task.id,
+            title: task.title,
+            description: task.description,
+            deadline: task.deadline ? new Date(task.deadline) : undefined,
+            category: task.categories
+              ? {
+                  name: task.categories.name,
+                  color: task.categories.color,
+                }
+              : undefined,
+            completed: task.completed,
+            timerStarted: task.timer_started,
+            timeSpent: task.time_spent,
+            expectedTime: task.expected_time,
+            createdAt: task.created_at,
+            completedAt: task.completed_at,
+          }));
+
+          console.log(
+            `Loaded ${allTasks.length} tasks from database for filtering`,
+          );
+        } else {
+          throw new Error("Supabase not available");
         }
-      } else if (newFilters.status === "Pending") {
+      } catch (dbError) {
+        console.error("Error loading tasks from database:", dbError);
+
+        // Fall back to localStorage
+        console.log("Falling back to localStorage for task filtering");
+        const userTasksKey = `taskManagerTasks_${currentUser.id}`;
+        const savedTasks =
+          StorageManager.getItem(userTasksKey) ||
+          StorageManager.getItem("taskManagerTasks");
+
+        if (savedTasks) {
+          const parsedTasks = JSON.parse(savedTasks);
+          allTasks = parsedTasks.map((task: any) => ({
+            ...task,
+            deadline: task.deadline ? new Date(task.deadline) : undefined,
+          }));
+          console.log(`Loaded ${allTasks.length} total tasks from storage`);
+        } else {
+          // If no tasks in storage, use current state
+          allTasks = [...tasks];
+        }
+      }
+
+      // If no filters are applied, show only non-completed tasks by default
+      if (
+        Object.keys(newFilters).length === 0 ||
+        (!newFilters.category &&
+          !newFilters.status &&
+          !newFilters.dateRange &&
+          !newFilters.searchTerm)
+      ) {
+        setTasks(allTasks.filter((task) => !task.completed));
+        return;
+      }
+
+      // Apply client-side filters to tasks
+      let filteredTasks = [...allTasks];
+
+      // Filter by category (if not already filtered by database)
+      if (newFilters.category) {
+        // Check if the category still exists in userSettings
+        const categoryExists = userSettings.categories.some(
+          (cat) => cat.name === newFilters.category,
+        );
+
+        if (categoryExists) {
+          filteredTasks = filteredTasks.filter(
+            (task) => task.category?.name === newFilters.category,
+          );
+        }
+      }
+
+      // Apply status filters if not already applied at database level
+      if (!supabase && newFilters.status) {
+        if (newFilters.status === "Completed") {
+          // Show completed tasks when explicitly filtered
+          filteredTasks = filteredTasks.filter((task) => task.completed);
+          console.log(`Showing ${filteredTasks.length} completed tasks`);
+
+          // Update URL to reflect completed status
+          try {
+            const url = new URL(window.location.href);
+            url.searchParams.set("status", "Completed");
+            window.history.pushState({}, "", url);
+          } catch (error) {
+            console.error("Error updating URL:", error);
+          }
+        } else if (newFilters.status === "Pending") {
+          filteredTasks = filteredTasks.filter((task) => !task.completed);
+
+          // Update URL to remove status parameter
+          try {
+            const url = new URL(window.location.href);
+            url.searchParams.delete("status");
+            window.history.pushState({}, "", url);
+          } catch (error) {
+            console.error("Error updating URL:", error);
+          }
+        } else if (newFilters.status === "Overdue") {
+          const now = new Date();
+          filteredTasks = filteredTasks.filter(
+            (task) => !task.completed && task.deadline && task.deadline < now,
+          );
+        }
+        // For "All" status, show all tasks (no filtering needed)
+      } else if (
+        !supabase &&
+        newFilters.status !== "All" &&
+        newFilters.status !== "Completed"
+      ) {
+        // By default, show only active tasks if not explicitly showing all or completed
         filteredTasks = filteredTasks.filter((task) => !task.completed);
-
-        // Update URL to remove status parameter
-        try {
-          const url = new URL(window.location.href);
-          url.searchParams.delete("status");
-          window.history.pushState({}, "", url);
-        } catch (error) {
-          console.error("Error updating URL:", error);
-        }
-      } else if (newFilters.status === "Overdue") {
-        const now = new Date();
-        filteredTasks = filteredTasks.filter(
-          (task) => !task.completed && task.deadline && task.deadline < now,
-        );
-      } else if (newFilters.status === "All") {
-        // For "All" status, show all tasks
-        // No filtering needed
       }
-    } else if (
-      newFilters.status !== "All" &&
-      newFilters.status !== "Completed"
-    ) {
-      // By default, show only active tasks if not explicitly showing all or completed
-      filteredTasks = filteredTasks.filter((task) => !task.completed);
-    }
 
-    // Filter by date
-    if (newFilters.dateRange) {
-      filteredTasks = filteredTasks.filter(
-        (task) =>
-          task.deadline && isSameDay(task.deadline, newFilters.dateRange),
-      );
-    }
+      // Filter by date
+      if (newFilters.dateRange) {
+        filteredTasks = filteredTasks.filter(
+          (task) =>
+            task.deadline && isSameDay(task.deadline, newFilters.dateRange),
+        );
+      }
 
-    // Filter by search term
-    if (newFilters.searchTerm) {
-      const searchLower = newFilters.searchTerm.toLowerCase();
-      filteredTasks = filteredTasks.filter(
-        (task) =>
-          task.title.toLowerCase().includes(searchLower) ||
-          (task.description &&
-            task.description.toLowerCase().includes(searchLower)),
-      );
-    }
+      // Filter by search term
+      if (newFilters.searchTerm) {
+        const searchLower = newFilters.searchTerm.toLowerCase();
+        filteredTasks = filteredTasks.filter(
+          (task) =>
+            task.title.toLowerCase().includes(searchLower) ||
+            (task.description &&
+              task.description.toLowerCase().includes(searchLower)),
+        );
+      }
 
-    console.log(`Setting ${filteredTasks.length} tasks after filtering`);
-    setTasks(filteredTasks);
+      console.log(`Setting ${filteredTasks.length} tasks after filtering`);
+      setTasks(filteredTasks);
+    } catch (error) {
+      console.error("Error in filter handling:", error);
+      // In case of error, try to show something reasonable
+      setTasks(tasks.filter((task) => !task.completed));
+    }
   };
 
   // Handle adding task from calendar
