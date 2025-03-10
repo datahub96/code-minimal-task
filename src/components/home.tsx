@@ -125,6 +125,18 @@ const Home = () => {
 
   // Load user settings and tasks when component mounts
   useEffect(() => {
+    // Force reload all tasks on initial load
+    const forceReloadAllTasks = () => {
+      try {
+        // Clear any cached tasks in memory
+        StorageManager.removeItem("taskManagerTasksCache");
+      } catch (error) {
+        console.error("Error clearing task cache:", error);
+      }
+    };
+
+    forceReloadAllTasks();
+
     // Import database functions
     const loadData = async () => {
       try {
@@ -677,23 +689,28 @@ const Home = () => {
   const handleFilterChange = (newFilters: any) => {
     setFilters(newFilters);
 
-    // Get the original tasks from localStorage
-    const savedTasks = localStorage.getItem("taskManagerTasks");
-    let originalTasks = [];
+    // Get all tasks from localStorage (including completed ones)
+    let allTasks = [];
+    try {
+      // Try to get user-specific tasks first
+      const userTasksKey = currentUser?.id
+        ? `taskManagerTasks_${currentUser.id}`
+        : "taskManagerTasks";
+      const savedTasks =
+        localStorage.getItem(userTasksKey) ||
+        localStorage.getItem("taskManagerTasks");
 
-    if (savedTasks) {
-      try {
+      if (savedTasks) {
         const parsedTasks = JSON.parse(savedTasks);
-        originalTasks = parsedTasks.map((task: any) => ({
+        allTasks = parsedTasks.map((task: any) => ({
           ...task,
           deadline: task.deadline ? new Date(task.deadline) : undefined,
         }));
-      } catch (error) {
-        console.error("Error parsing saved tasks:", error);
-        originalTasks = [];
       }
-    } else {
-      originalTasks = [];
+    } catch (error) {
+      console.error("Error parsing saved tasks:", error);
+      // Fallback to current state if there's an error
+      allTasks = [...tasks];
     }
 
     // If no filters are applied, show only non-completed tasks by default
@@ -704,12 +721,12 @@ const Home = () => {
         !newFilters.dateRange &&
         !newFilters.searchTerm)
     ) {
-      setTasks(originalTasks.filter((task) => !task.completed));
+      setTasks(allTasks.filter((task) => !task.completed));
       return;
     }
 
     // Apply filters to tasks
-    let filteredTasks = [...originalTasks];
+    let filteredTasks = [...allTasks];
 
     // Filter by category
     if (newFilters.category) {
@@ -819,7 +836,9 @@ const Home = () => {
 
   // Determine if we should show completed tasks based on URL parameters or filters
   const urlParams = new URLSearchParams(window.location.search);
-  const showCompleted = urlParams.get("status") === "Completed";
+  const showCompleted =
+    urlParams.get("status") === "Completed" ||
+    (filters as any)?.status === "Completed";
 
   // Handle adding tasks from daily planner
   const handleAddTasksFromPlanner = async (tasksToAdd: any[]) => {

@@ -75,7 +75,7 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ userId }) => {
 
   useEffect(() => {
     // Load tasks from localStorage
-    const loadTasks = () => {
+    const loadTasks = async () => {
       setLoading(true);
       try {
         // Get current user
@@ -90,7 +90,44 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ userId }) => {
           const user = JSON.parse(userJson);
           const currentUserId = user.id;
 
-          // Get tasks for the current user
+          // Try to load from database first if available
+          try {
+            const { getTasks } = await import("@/lib/database");
+            const dbTasks = await getTasks(currentUserId);
+
+            if (dbTasks && dbTasks.length > 0) {
+              // Process tasks from database
+              const processedTasks = dbTasks.map((task: any) => ({
+                ...task,
+                deadline:
+                  task.deadline instanceof Date
+                    ? task.deadline
+                    : task.deadline
+                      ? new Date(task.deadline)
+                      : undefined,
+                createdAt:
+                  task.createdAt ||
+                  new Date(
+                    Date.now() - Math.random() * 30 * 86400000,
+                  ).toISOString(),
+                completedAt: task.completed
+                  ? task.completedAt ||
+                    new Date(
+                      Date.now() - Math.random() * 15 * 86400000,
+                    ).toISOString()
+                  : undefined,
+              }));
+
+              setTasks(processedTasks);
+              setLoading(false);
+              return;
+            }
+          } catch (dbError) {
+            console.error("Error loading tasks from database:", dbError);
+            // Fall back to localStorage
+          }
+
+          // Get tasks for the current user from localStorage
           const tasksJson =
             localStorage.getItem(`taskManagerTasks_${currentUserId}`) ||
             localStorage.getItem("taskManagerTasks");
@@ -143,7 +180,11 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ userId }) => {
     return tasks.filter((task) => {
       const taskDate =
         task.deadline ||
-        (task.createdAt ? new Date(task.createdAt) : new Date());
+        (task.completedAt
+          ? new Date(task.completedAt)
+          : task.createdAt
+            ? new Date(task.createdAt)
+            : new Date());
       if (timeFrame === "today") return isToday(taskDate);
       if (timeFrame === "week") return isThisWeek(taskDate);
       if (timeFrame === "month") return isThisMonth(taskDate);

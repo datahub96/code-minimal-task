@@ -100,9 +100,20 @@ export async function getTasks(userId) {
 
   // localStorage fallback
   try {
-    const tasks = JSON.parse(
-      localStorage.getItem(`taskManagerTasks_${userId}`) || "[]",
-    );
+    // Try user-specific tasks first, then fall back to general tasks
+    let tasksJson = localStorage.getItem(`taskManagerTasks_${userId}`);
+
+    // If no user-specific tasks, try the general tasks
+    if (!tasksJson) {
+      tasksJson = localStorage.getItem("taskManagerTasks");
+    }
+
+    // If still no tasks, return empty array
+    if (!tasksJson) {
+      return [];
+    }
+
+    const tasks = JSON.parse(tasksJson);
     return tasks.map((task) => ({
       ...task,
       deadline: task.deadline ? new Date(task.deadline) : undefined,

@@ -85,15 +85,20 @@ const FilterBar = ({
     onFilterChange(newFilters); // Always pass filters, even for default "Pending"
 
     // Update URL with status parameter for direct linking
-    const url = new URL(window.location.href);
-    if (value === "Completed") {
-      url.searchParams.set("status", "Completed");
-    } else if (value === "All") {
-      url.searchParams.delete("status");
-    } else {
-      url.searchParams.set("status", value);
+    try {
+      const url = new URL(window.location.href);
+      if (value === "Completed") {
+        url.searchParams.set("status", "Completed");
+      } else if (value === "All") {
+        url.searchParams.delete("status");
+      } else {
+        url.searchParams.set("status", value);
+      }
+      window.history.pushState({}, "", url);
+    } catch (error) {
+      console.error("Error updating URL:", error);
+      // Continue without updating URL if there's an error
     }
-    window.history.pushState({}, "", url);
   };
 
   const handleDateChange = (date: Date | undefined) => {
