@@ -761,6 +761,15 @@ const Home = () => {
         // Show completed tasks when explicitly filtered
         filteredTasks = filteredTasks.filter((task) => task.completed);
         console.log(`Showing ${filteredTasks.length} completed tasks`);
+
+        // Update URL to reflect completed status
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.set("status", "Completed");
+          window.history.pushState({}, "", url);
+        } catch (error) {
+          console.error("Error updating URL:", error);
+        }
       } else if (newFilters.status === "Pending") {
         filteredTasks = filteredTasks.filter((task) => !task.completed);
       } else if (newFilters.status === "Overdue") {

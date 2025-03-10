@@ -448,7 +448,7 @@ const TaskList = ({
     null,
   );
 
-  // Determine if we should show completed tasks based on URL parameters or filters
+  // Determine if we should show completed tasks based on URL parameters
   const urlParams = new URLSearchParams(window.location.search);
   const showCompleted =
     urlParams.get("status") === "Completed" ||

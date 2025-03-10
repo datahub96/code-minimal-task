@@ -87,7 +87,23 @@ const FilterBar = ({
     // When switching to Completed view, just update the URL without reloading
     if (value === "Completed") {
       // This will ensure we get all tasks including completed ones
-      const allTasksJson = localStorage.getItem("taskManagerTasks");
+      const userJson = localStorage.getItem("taskManagerUser");
+      let userId = null;
+      if (userJson) {
+        try {
+          const user = JSON.parse(userJson);
+          userId = user.id;
+        } catch (error) {
+          console.error("Error parsing user data:", error);
+        }
+      }
+
+      // Try user-specific tasks first, then fall back to general tasks
+      const allTasksJson = userId
+        ? localStorage.getItem(`taskManagerTasks_${userId}`) ||
+          localStorage.getItem("taskManagerTasks")
+        : localStorage.getItem("taskManagerTasks");
+
       if (allTasksJson) {
         try {
           const allTasks = JSON.parse(allTasksJson);
