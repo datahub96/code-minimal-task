@@ -124,6 +124,14 @@ const TaskForm: React.FC<ExtendedTaskFormProps> = ({
     }
   };
 
+  // Custom styles for form elements to make borders more visible in dark mode
+  const inputStyles =
+    "border-2 border-gray-300 dark:border-gray-500 focus:border-blue-500 dark:focus:border-blue-400";
+  const textareaStyles =
+    "border-2 border-gray-300 dark:border-gray-500 focus:border-blue-500 dark:focus:border-blue-400";
+  const selectStyles = "border-2 border-gray-300 dark:border-gray-500";
+  const buttonStyles = "border-2 border-gray-300 dark:border-gray-500";
+
   return (
     <div className="w-full max-w-md p-3 md:p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
       <h2 className="text-lg md:text-2xl font-bold mb-3 md:mb-6 text-gray-800 dark:text-gray-100">
@@ -142,7 +150,11 @@ const TaskForm: React.FC<ExtendedTaskFormProps> = ({
               <FormItem>
                 <FormLabel>Task Title</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter task title" {...field} />
+                  <Input
+                    placeholder="Enter task title"
+                    className={inputStyles}
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -158,7 +170,7 @@ const TaskForm: React.FC<ExtendedTaskFormProps> = ({
                 <FormControl>
                   <Textarea
                     placeholder="Enter task description"
-                    className="min-h-[100px]"
+                    className={`min-h-[100px] ${textareaStyles}`}
                     {...field}
                   />
                 </FormControl>
@@ -173,7 +185,7 @@ const TaskForm: React.FC<ExtendedTaskFormProps> = ({
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
-                  className="w-full justify-start text-left font-normal text-xs md:text-sm h-9"
+                  className={`w-full justify-start text-left font-normal text-xs md:text-sm h-9 ${buttonStyles}`}
                 >
                   <CalendarIcon className="mr-2 h-3.5 w-3.5 md:h-4 md:w-4" />
                   {date ? format(date, "PPP") : <span>Select a date</span>}
@@ -201,7 +213,7 @@ const TaskForm: React.FC<ExtendedTaskFormProps> = ({
                   defaultValue={field.value}
                 >
                   <FormControl>
-                    <SelectTrigger>
+                    <SelectTrigger className={selectStyles}>
                       <div className="flex items-center">
                         <Tag className="mr-2 h-4 w-4" />
                         <SelectValue placeholder="Select a category" />
@@ -252,7 +264,7 @@ const TaskForm: React.FC<ExtendedTaskFormProps> = ({
                   defaultValue={field.value}
                 >
                   <FormControl>
-                    <SelectTrigger>
+                    <SelectTrigger className={selectStyles}>
                       <div className="flex items-center">
                         <Bell className="mr-2 h-4 w-4" />
                         <SelectValue placeholder="Set reminder time" />
@@ -287,7 +299,7 @@ const TaskForm: React.FC<ExtendedTaskFormProps> = ({
                     <Input
                       type="number"
                       placeholder="Hours"
-                      className="w-1/3"
+                      className={`w-1/3 ${inputStyles}`}
                       value={Math.floor((field.value || 0) / (1000 * 60 * 60))}
                       onChange={(e) => {
                         const hours = parseInt(e.target.value) || 0;
@@ -306,7 +318,7 @@ const TaskForm: React.FC<ExtendedTaskFormProps> = ({
                     <Input
                       type="number"
                       placeholder="Minutes"
-                      className="w-1/3"
+                      className={`w-1/3 ${inputStyles}`}
                       value={Math.floor(
                         ((field.value || 0) % (1000 * 60 * 60)) / (1000 * 60),
                       )}
@@ -328,7 +340,7 @@ const TaskForm: React.FC<ExtendedTaskFormProps> = ({
                     <Input
                       type="number"
                       placeholder="Seconds"
-                      className="w-1/3"
+                      className={`w-1/3 ${inputStyles}`}
                       value={Math.floor(
                         ((field.value || 0) % (1000 * 60)) / 1000,
                       )}
@@ -367,7 +379,7 @@ const TaskForm: React.FC<ExtendedTaskFormProps> = ({
                   <Input
                     type="number"
                     placeholder="Hours"
-                    className="w-1/2"
+                    className={`w-1/2 ${inputStyles}`}
                     value={Math.floor((field.value || 0) / (1000 * 60 * 60))}
                     onChange={(e) => {
                       const hours = parseInt(e.target.value) || 0;
@@ -383,7 +395,7 @@ const TaskForm: React.FC<ExtendedTaskFormProps> = ({
                   <Input
                     type="number"
                     placeholder="Minutes"
-                    className="w-1/2"
+                    className={`w-1/2 ${inputStyles}`}
                     value={Math.floor(
                       ((field.value || 0) % (1000 * 60 * 60)) / (1000 * 60),
                     )}
@@ -409,7 +421,12 @@ const TaskForm: React.FC<ExtendedTaskFormProps> = ({
           />
 
           <div className="flex justify-end space-x-2 pt-4">
-            <Button type="button" variant="outline" onClick={onCancel}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onCancel}
+              className={buttonStyles}
+            >
               Cancel
             </Button>
             <Button type="submit">
