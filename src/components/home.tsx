@@ -855,6 +855,17 @@ const Home = () => {
     urlParams.get("status") === "Completed" ||
     (filters as any)?.status === "Completed";
 
+  // Ensure filter state is consistent with URL parameters
+  useEffect(() => {
+    const statusParam = urlParams.get("status");
+    if (
+      statusParam === "Completed" &&
+      (filters as any)?.status !== "Completed"
+    ) {
+      handleFilterChange({ status: "Completed" });
+    }
+  }, [urlParams.get("status")]);
+
   // Check URL on initial load to handle direct links to completed tasks
   useEffect(() => {
     if (urlParams.get("status") === "Completed") {

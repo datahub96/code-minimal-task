@@ -452,7 +452,8 @@ const TaskList = ({
   const urlParams = new URLSearchParams(window.location.search);
   const showCompleted =
     urlParams.get("status") === "Completed" ||
-    tasks.every((task) => task.completed);
+    tasks.every((task) => task.completed) ||
+    (tasks.length > 0 && tasks.every((task) => task.completed));
 
   // Always show all tasks, regardless of completion status
   const visibleTasks = tasks;
