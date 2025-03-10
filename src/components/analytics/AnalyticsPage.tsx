@@ -197,6 +197,9 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ userId }) => {
   // Calculate analytics data
   const totalTasks = filteredTasks.length;
   const completedTasks = filteredTasks.filter((task) => task.completed).length;
+  console.log(
+    `Analytics found ${completedTasks} completed tasks out of ${totalTasks} total tasks`,
+  );
   const pendingTasks = totalTasks - completedTasks;
   const completionRate =
     totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;

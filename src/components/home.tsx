@@ -687,6 +687,7 @@ const Home = () => {
 
   // Handle filter changes
   const handleFilterChange = (newFilters: any) => {
+    console.log("Filter change:", newFilters);
     setFilters(newFilters);
 
     // Get all tasks from localStorage (including completed ones)
@@ -706,11 +707,23 @@ const Home = () => {
           ...task,
           deadline: task.deadline ? new Date(task.deadline) : undefined,
         }));
+        console.log(`Loaded ${allTasks.length} total tasks from storage`);
+        console.log(
+          `Of which ${allTasks.filter((t) => t.completed).length} are completed`,
+        );
       }
     } catch (error) {
       console.error("Error parsing saved tasks:", error);
       // Fallback to current state if there's an error
       allTasks = [...tasks];
+    }
+
+    // Check URL parameters for status=Completed
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlStatus = urlParams.get("status");
+    if (urlStatus === "Completed") {
+      // Override filters to show completed tasks
+      newFilters.status = "Completed";
     }
 
     // If no filters are applied, show only non-completed tasks by default
@@ -747,6 +760,7 @@ const Home = () => {
       if (newFilters.status === "Completed") {
         // Show completed tasks when explicitly filtered
         filteredTasks = filteredTasks.filter((task) => task.completed);
+        console.log(`Showing ${filteredTasks.length} completed tasks`);
       } else if (newFilters.status === "Pending") {
         filteredTasks = filteredTasks.filter((task) => !task.completed);
       } else if (newFilters.status === "Overdue") {
@@ -785,6 +799,7 @@ const Home = () => {
       );
     }
 
+    console.log(`Setting ${filteredTasks.length} tasks after filtering`);
     setTasks(filteredTasks);
   };
 
@@ -839,6 +854,13 @@ const Home = () => {
   const showCompleted =
     urlParams.get("status") === "Completed" ||
     (filters as any)?.status === "Completed";
+
+  // Check URL on initial load to handle direct links to completed tasks
+  useEffect(() => {
+    if (urlParams.get("status") === "Completed") {
+      handleFilterChange({ status: "Completed" });
+    }
+  }, []);
 
   // Handle adding tasks from daily planner
   const handleAddTasksFromPlanner = async (tasksToAdd: any[]) => {

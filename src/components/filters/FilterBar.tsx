@@ -93,6 +93,10 @@ const FilterBar = ({
           const allTasks = JSON.parse(allTasksJson);
           const completedTasks = allTasks.filter((task: any) => task.completed);
           console.log(`Found ${completedTasks.length} completed tasks`);
+
+          // Force reload the page to ensure completed tasks are shown
+          window.location.href = window.location.pathname + "?status=Completed";
+          return; // Stop execution since we're reloading
         } catch (error) {
           console.error("Error parsing tasks:", error);
         }
