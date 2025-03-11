@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import { Suspense } from "react";
+import { useState, useEffect } from "react";
 import { isSameDay } from "date-fns";
 import { StorageManager } from "@/components/storage/StorageManager";
 import { supabase } from "@/lib/supabase";
@@ -9,7 +10,7 @@ import FilterBar from "./filters/FilterBar";
 import TaskForm from "./tasks/TaskForm";
 import SettingsPanel from "./settings/SettingsPanel";
 import AnalyticsPage from "./analytics/AnalyticsPage";
-import DailyPlanner from "./planner/DailyPlanner";
+import DailySummary from "./planner/DailySummary";
 import { Button } from "./ui/button";
 import { Plus, BarChart2, Calendar, List } from "lucide-react";
 import { Dialog, DialogContent, DialogTrigger } from "./ui/dialog";
@@ -38,6 +39,7 @@ interface Task {
   timerStarted?: number; // timestamp when timer was started
   timeSpent?: number; // time spent in milliseconds
   expectedTime?: number; // expected time to complete in milliseconds
+  phase?: number; // task phase number (for split tasks)
 }
 
 // Sample tasks data
@@ -90,8 +92,8 @@ const Home = () => {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isTaskFormOpen, setIsTaskFormOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isPlannerOpen, setIsPlannerOpen] = useState(false);
-  const [showPlannerOnLogin, setShowPlannerOnLogin] = useState(true);
+  const [isSummaryOpen, setIsSummaryOpen] = useState(false);
+  const [showSummaryOnLogin, setShowSummaryOnLogin] = useState(true);
   const [userSettings, setUserSettings] = useState({
     darkMode: false,
     defaultView: "card",
@@ -147,14 +149,14 @@ const Home = () => {
           const user = JSON.parse(userJson);
           setCurrentUser(user);
 
-          // Show planner on login if enabled and this is a fresh login
-          const hasShownPlanner = StorageManager.getItem(
-            "plannerShownForSession",
+          // Show summary on login if enabled and this is a fresh login
+          const hasShownSummary = StorageManager.getItem(
+            "summaryShownForSession",
           );
-          if (showPlannerOnLogin && !hasShownPlanner) {
-            setIsPlannerOpen(true);
-            // Mark that we've shown the planner for this session
-            StorageManager.setItem("plannerShownForSession", "true");
+          if (showSummaryOnLogin && !hasShownSummary) {
+            setIsSummaryOpen(true);
+            // Mark that we've shown the summary for this session
+            StorageManager.setItem("summaryShownForSession", "true");
           }
 
           // Check URL parameters for status=Completed
@@ -241,9 +243,12 @@ const Home = () => {
             setCurrentView(parsedSettings.defaultView);
           }
 
-          // Apply saved planner setting
-          if (parsedSettings.showPlannerOnLogin !== undefined) {
-            setShowPlannerOnLogin(parsedSettings.showPlannerOnLogin);
+          // Apply summary setting
+          if (parsedSettings.showSummaryOnLogin !== undefined) {
+            setShowSummaryOnLogin(parsedSettings.showSummaryOnLogin);
+          } else if (parsedSettings.showPlannerOnLogin !== undefined) {
+            // Backward compatibility with old setting name
+            setShowSummaryOnLogin(parsedSettings.showPlannerOnLogin);
           }
         }
       } catch (error) {
@@ -405,6 +410,181 @@ const Home = () => {
 
     // Save all tasks to localStorage
     saveTasksToLocalStorage(updatedTasks);
+
+    // Apply current filters to the updated tasks
+    if (Object.keys(filters).length > 0) {
+      handleFilterChange(filters);
+    } else {
+      // If no filters, show only non-completed tasks by default
+      setTasks(updatedTasks.filter((task) => !task.completed));
+    }
+  };
+
+  // Handle splitting a task into two parts
+  const handleSplitTask = async (
+    taskId: string,
+    timeSpentOnCompleted: number,
+    remainingTime: number,
+  ) => {
+    console.log("Split task called with:", {
+      taskId,
+      timeSpentOnCompleted,
+      remainingTime,
+    });
+    // Get all tasks from localStorage to ensure we have the complete set
+    let allTasks = [];
+
+    try {
+      const savedTasks = localStorage.getItem("taskManagerTasks");
+      if (savedTasks) {
+        const parsedTasks = JSON.parse(savedTasks);
+        allTasks = parsedTasks.map((task: any) => ({
+          ...task,
+          deadline: task.deadline ? new Date(task.deadline) : undefined,
+        }));
+      } else {
+        allTasks = [...tasks]; // Fallback to current state
+      }
+    } catch (error) {
+      console.error("Error parsing saved tasks:", error);
+      allTasks = [...tasks]; // Fallback to current state
+    }
+
+    // Find the task to split
+    const taskToSplit = allTasks.find((task) => task.id === taskId);
+    if (!taskToSplit) {
+      console.error("Task not found for splitting:", taskId);
+      return;
+    }
+
+    console.log("Found task to split:", taskToSplit);
+
+    // Calculate time spent for the completed part and the new task
+    const actualTimeSpentOnCompleted = timeSpentOnCompleted || 0;
+    const actualRemainingTime =
+      remainingTime ||
+      (taskToSplit.timeSpent || 0) - actualTimeSpentOnCompleted;
+
+    console.log("Time calculations:", {
+      actualTimeSpentOnCompleted,
+      actualRemainingTime,
+      originalTimeSpent: taskToSplit.timeSpent,
+    });
+
+    // Calculate expected time for each part
+    // If the original task has an expected time, divide it proportionally
+    const totalExpectedTime = taskToSplit.expectedTime || 3600000; // Default 1 hour
+    const completedPartRatio =
+      actualTimeSpentOnCompleted / (taskToSplit.timeSpent || 1);
+    const expectedTimeForCompleted = Math.floor(
+      totalExpectedTime * completedPartRatio,
+    );
+    const expectedTimeForRemaining =
+      totalExpectedTime - expectedTimeForCompleted;
+
+    // Extract the base title without any phase information
+    let baseTitle = taskToSplit.title;
+    // Remove all phase information from the title (multiple phases if present)
+    baseTitle = baseTitle.replace(/\s*\(Phase \d+( - Completed)?\)\s*/g, "");
+
+    // Extract current phase from title if it exists, or use the phase property, or default to 1
+    let currentPhase = taskToSplit.phase || 1;
+
+    // Try to extract phase from title if it contains phase information
+    const phaseMatch = taskToSplit.title.match(/\(Phase (\d+)/);
+    if (phaseMatch && phaseMatch[1]) {
+      currentPhase = parseInt(phaseMatch[1], 10);
+    }
+
+    // Update the original task to be completed with the time spent on the completed part
+    const updatedOriginalTask = {
+      ...taskToSplit,
+      title: `${baseTitle} (Phase ${currentPhase} - Completed)`,
+      completed: true,
+      timerStarted: undefined,
+      timeSpent: actualTimeSpentOnCompleted,
+      expectedTime: expectedTimeForCompleted,
+      completedAt: new Date().toISOString(),
+    };
+
+    // Create a new task for the remaining work
+
+    const newTask: Task = {
+      id: `${taskId}-phase-${currentPhase + 1}-${Date.now()}`,
+      title: `${baseTitle} (Phase ${currentPhase + 1})`,
+      description: taskToSplit.description,
+      deadline: taskToSplit.deadline,
+      category: taskToSplit.category,
+      completed: false,
+      timeSpent: actualRemainingTime,
+      expectedTime: expectedTimeForRemaining,
+      phase: currentPhase + 1,
+      createdAt: new Date().toISOString(),
+    };
+
+    console.log("Expected time division:", {
+      original: totalExpectedTime,
+      completed: expectedTimeForCompleted,
+      remaining: expectedTimeForRemaining,
+      ratio: completedPartRatio,
+    });
+
+    console.log("Created new task:", newTask);
+
+    // Try to update in database first
+    try {
+      if (currentUser) {
+        const { updateTask, createTask } = await import("@/lib/database");
+
+        // Update the original task
+        await updateTask(taskId, {
+          ...updatedOriginalTask,
+          userId: currentUser.id,
+        });
+
+        // Create the new task
+        await createTask({
+          ...newTask,
+          userId: currentUser.id,
+        });
+
+        console.log("Task split completed in database");
+      }
+    } catch (dbError) {
+      console.error("Error splitting task in database:", dbError);
+      // Continue with local update even if database update fails
+    }
+
+    // Update the tasks in local state
+    const updatedTasks = allTasks.map((task) => {
+      if (task.id === taskId) {
+        return updatedOriginalTask;
+      }
+      return task;
+    });
+
+    // Add the new task
+    updatedTasks.push(newTask);
+
+    console.log("Updated tasks array:", updatedTasks.length);
+
+    // Save all tasks to localStorage
+    saveTasksToLocalStorage(updatedTasks);
+
+    // Force reload all tasks to ensure we see the changes
+    const allTasksFromStorage = localStorage.getItem("taskManagerTasks");
+    if (allTasksFromStorage) {
+      try {
+        const parsedTasks = JSON.parse(allTasksFromStorage);
+        const tasksWithDates = parsedTasks.map((task: any) => ({
+          ...task,
+          deadline: task.deadline ? new Date(task.deadline) : undefined,
+        }));
+        setTasks(tasksWithDates);
+      } catch (error) {
+        console.error("Error parsing tasks after split:", error);
+      }
+    }
 
     // Apply current filters to the updated tasks
     if (Object.keys(filters).length > 0) {
@@ -725,6 +905,30 @@ const Home = () => {
     // Store the previous filters to check for status changes
     const prevFilters = filters;
 
+    // Check if this is a forced reset from Completed to Pending
+    const isForceReset = newFilters.forceReset === true;
+    if (isForceReset) {
+      console.log("FORCE RESET detected - ensuring we load pending tasks");
+      // Remove the flag to avoid infinite loops
+      delete newFilters.forceReset;
+
+      // Ensure we're loading pending tasks
+      newFilters.status = "Pending";
+    }
+
+    // Special handling for switching from Completed to Pending
+    if (
+      (prevFilters as any)?.status === "Completed" &&
+      newFilters.status === "Pending"
+    ) {
+      console.log("Switching from Completed to Pending tasks");
+      // Force a complete reset of the filter state
+      newFilters = {
+        ...newFilters,
+        status: "Pending",
+      };
+    }
+
     // Force status to Pending if it was previously Completed and now being removed
     if ((prevFilters as any)?.status === "Completed" && !newFilters.status) {
       newFilters.status = "Pending";
@@ -876,8 +1080,11 @@ const Home = () => {
           }
         } else if (newFilters.status === "Pending") {
           // Explicitly filter to only show non-completed tasks
-          filteredTasks = filteredTasks.filter((task) => !task.completed);
-          console.log(`Showing ${filteredTasks.length} pending tasks`);
+          const pendingTasks = filteredTasks.filter((task) => !task.completed);
+          console.log(
+            `Showing ${pendingTasks.length} pending tasks (from ${filteredTasks.length} total)`,
+          );
+          filteredTasks = pendingTasks;
 
           // Remove status from URL for pending tasks (default state)
           try {
@@ -900,8 +1107,11 @@ const Home = () => {
           (newFilters.status !== "All" && newFilters.status !== "Completed"))
       ) {
         // By default, show only active tasks if not explicitly showing all or completed
-        filteredTasks = filteredTasks.filter((task) => !task.completed);
-        console.log("Default filter: showing only pending tasks");
+        const pendingTasks = filteredTasks.filter((task) => !task.completed);
+        console.log(
+          `Default filter: showing only ${pendingTasks.length} pending tasks (from ${filteredTasks.length} total)`,
+        );
+        filteredTasks = pendingTasks;
 
         // Remove status from URL when showing default pending tasks
         try {
@@ -1001,9 +1211,9 @@ const Home = () => {
       );
     }
 
-    // Apply planner setting
-    if (newSettings.showPlannerOnLogin !== showPlannerOnLogin) {
-      setShowPlannerOnLogin(newSettings.showPlannerOnLogin);
+    // Apply summary setting
+    if (newSettings.showSummaryOnLogin !== showSummaryOnLogin) {
+      setShowSummaryOnLogin(newSettings.showSummaryOnLogin);
     }
   };
 
@@ -1039,7 +1249,8 @@ const Home = () => {
       (!statusParam || statusParam === "Pending") &&
       (filters as any)?.status !== "Pending"
     ) {
-      handleFilterChange({ status: "Pending" });
+      // Force a reset when switching to Pending
+      handleFilterChange({ status: "Pending", forceReset: true });
     }
   }, [urlParams.get("status")]);
 
@@ -1095,7 +1306,7 @@ const Home = () => {
         isDarkMode={isDarkMode}
         currentView={currentView}
         onSettingsClick={() => setIsSettingsOpen(true)}
-        onPlannerClick={() => setIsPlannerOpen(true)}
+        onPlannerClick={() => setIsSummaryOpen(true)}
       />
 
       {/* Main content */}
@@ -1256,6 +1467,7 @@ const Home = () => {
                 onTaskDelete={handleTaskDelete}
                 onTaskReorder={handleTaskReorder}
                 onTimerToggle={handleTimerToggle}
+                onSplitTask={handleSplitTask}
                 viewMode="list"
               />
             ) : currentView === "card" ? (
@@ -1266,6 +1478,7 @@ const Home = () => {
                 onTaskDelete={handleTaskDelete}
                 onTaskReorder={handleTaskReorder}
                 onTimerToggle={handleTimerToggle}
+                onSplitTask={handleSplitTask}
                 viewMode="card"
               />
             ) : (
@@ -1298,12 +1511,12 @@ const Home = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Daily Planner dialog */}
-      <Dialog open={isPlannerOpen} onOpenChange={setIsPlannerOpen}>
-        <DialogContent className="sm:max-w-[900px]">
-          <DailyPlanner
-            onClose={() => setIsPlannerOpen(false)}
-            onAddTasks={handleAddTasksFromPlanner}
+      {/* Daily Summary dialog */}
+      <Dialog open={isSummaryOpen} onOpenChange={setIsSummaryOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DailySummary
+            onClose={() => setIsSummaryOpen(false)}
+            onTaskClick={handleTaskEdit}
           />
         </DialogContent>
       </Dialog>

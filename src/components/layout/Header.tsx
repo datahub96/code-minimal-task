@@ -179,7 +179,7 @@ const Header = ({
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Daily Planner</p>
+                <p>Today's Summary</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>

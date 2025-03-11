@@ -1,11 +1,21 @@
 import React, { useState } from "react";
 import { DragHandleDots2Icon } from "@radix-ui/react-icons";
-import { Check, Clock, Edit, Trash2, Timer, Play, Pause } from "lucide-react";
+import {
+  Check,
+  Clock,
+  Edit,
+  Trash2,
+  Timer,
+  Play,
+  Pause,
+  Split,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card } from "../ui/card";
 import { Checkbox } from "../ui/checkbox";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
+import TaskTimerBadge from "@/components/ui/task-timer-badge";
 import {
   Tooltip,
   TooltipContent,
@@ -26,6 +36,7 @@ export interface Task {
   timerStarted?: number;
   timeSpent?: number;
   expectedTime?: number;
+  phase?: number;
 }
 
 interface TaskListProps {
@@ -35,6 +46,11 @@ interface TaskListProps {
   onTaskDelete?: (taskId: string) => void;
   onTaskReorder?: (startIndex: number, endIndex: number) => void;
   onTimerToggle?: (taskId: string, isRunning: boolean) => void;
+  onSplitTask?: (
+    taskId: string,
+    timeSpentOnCompleted: number,
+    remainingTime: number,
+  ) => void;
   viewMode?: "list" | "card";
 }
 
@@ -66,6 +82,7 @@ const TaskItem = ({
   onEdit,
   onDelete,
   onTimerToggle,
+  onSplitTask,
   viewMode = "list",
 }: {
   task?: Task;
@@ -73,6 +90,12 @@ const TaskItem = ({
   onEdit?: () => void;
   onDelete?: () => void;
   onTimerToggle?: (isRunning: boolean) => void;
+  onSplitTask?: (
+    taskId: string,
+    timeSpentOnCompleted: number,
+    remainingTime: number,
+  ) => void;
+  phase?: number;
   viewMode?: "list" | "card";
 }) => {
   const [isAnimating, setIsAnimating] = useState(false);
@@ -126,20 +149,36 @@ const TaskItem = ({
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() =>
-                      onTimerToggle?.(task.timerStarted ? false : true)
-                    }
-                    className="h-8 w-8"
-                  >
-                    {task.timerStarted ? (
-                      <Pause className="h-4 w-4 text-amber-500" />
-                    ) : (
-                      <Play className="h-4 w-4 text-green-500" />
-                    )}
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    {!task.completed &&
+                      task.timeSpent &&
+                      task.timeSpent > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() =>
+                            onSplitTask?.(task.id, task.timeSpent || 0, 0)
+                          }
+                          className="h-8 w-8"
+                        >
+                          <Split className="h-4 w-4 text-purple-500" />
+                        </Button>
+                      )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() =>
+                        onTimerToggle?.(task.timerStarted ? false : true)
+                      }
+                      className="h-8 w-8"
+                    >
+                      {task.timerStarted ? (
+                        <Pause className="h-4 w-4 text-amber-500" />
+                      ) : (
+                        <Play className="h-4 w-4 text-green-500" />
+                      )}
+                    </Button>
+                  </div>
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>{task.timerStarted ? "Pause timer" : "Start timer"}</p>
@@ -192,7 +231,7 @@ const TaskItem = ({
                   <TooltipTrigger asChild>
                     <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
                       <Timer className="h-3 w-3 mr-1" />
-                      {formatTime(task.timeSpent)}
+                      {task.timeSpent > 0 ? formatTime(task.timeSpent) : ""}
                     </div>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -295,7 +334,7 @@ const TaskItem = ({
               <TooltipTrigger asChild>
                 <div className="flex items-center text-[10px] md:text-xs text-gray-500 dark:text-gray-400">
                   <Timer className="h-3 w-3 mr-0.5 md:mr-1" />
-                  {formatTime(task.timeSpent)}
+                  {task.timeSpent > 0 ? formatTime(task.timeSpent) : ""}
                 </div>
               </TooltipTrigger>
               <TooltipContent>
@@ -339,29 +378,52 @@ const TaskItem = ({
       </div>
 
       <div className="flex items-center gap-1 ml-auto">
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() =>
-                  onTimerToggle?.(task.timerStarted ? false : true)
-                }
-                className="h-7 w-7 md:h-8 md:w-8 p-0"
-              >
-                {task.timerStarted ? (
-                  <Pause className="h-3 w-3 md:h-4 md:w-4 text-amber-500" />
-                ) : (
-                  <Play className="h-3 w-3 md:h-4 md:w-4 text-green-500" />
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>{task.timerStarted ? "Pause timer" : "Start timer"}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <div className="flex items-center gap-1">
+          {!task.completed && task.timeSpent && task.timeSpent > 0 && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() =>
+                      onSplitTask?.(task.id, task.timeSpent || 0, 0)
+                    }
+                    className="h-7 w-7 md:h-8 md:w-8 p-0"
+                  >
+                    <Split className="h-3 w-3 md:h-4 md:w-4 text-purple-500" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Split task</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() =>
+                    onTimerToggle?.(task.timerStarted ? false : true)
+                  }
+                  className="h-7 w-7 md:h-8 md:w-8 p-0"
+                >
+                  {task.timerStarted ? (
+                    <Pause className="h-3 w-3 md:h-4 md:w-4 text-amber-500" />
+                  ) : (
+                    <Play className="h-3 w-3 md:h-4 md:w-4 text-green-500" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{task.timerStarted ? "Pause timer" : "Start timer"}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
 
         <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
           <Button
@@ -441,6 +503,7 @@ const TaskList = ({
   onTaskDelete,
   onTaskReorder,
   onTimerToggle,
+  onSplitTask,
   viewMode = "list",
 }: TaskListProps) => {
   const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
@@ -518,6 +581,8 @@ const TaskList = ({
                   onTimerToggle={(isRunning) =>
                     onTimerToggle?.(task.id, isRunning)
                   }
+                  onSplitTask={onSplitTask}
+                  phase={task.phase}
                   viewMode="card"
                 />
               </div>
@@ -554,6 +619,8 @@ const TaskList = ({
                   onTimerToggle={(isRunning) =>
                     onTimerToggle?.(task.id, isRunning)
                   }
+                  onSplitTask={onSplitTask}
+                  phase={task.phase}
                   viewMode="list"
                 />
               </div>

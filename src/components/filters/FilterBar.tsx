@@ -84,10 +84,46 @@ const FilterBar = ({
   };
 
   const handleStatusChange = async (value: string) => {
+    // When switching from Completed to Pending, we need to force a complete reset
+    if (filters.status === "Completed" && value === "Pending") {
+      // First reset all filters to default state
+      const resetFilters = {
+        category: filters.category, // Keep category filter
+        status: "Pending",
+        dateRange: filters.dateRange, // Keep date filter if any
+        searchTerm: filters.searchTerm, // Keep search term if any
+      };
+
+      // Update state immediately
+      setFilters(resetFilters);
+      updateActiveFilters("status", "Pending");
+
+      // Force a complete reload with pending tasks
+      // Use a timeout to ensure state is updated before filter change is processed
+      setTimeout(() => {
+        onFilterChange({
+          ...resetFilters,
+          forceReset: true, // Add a flag to force reset
+        });
+      }, 0);
+
+      // Update URL
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("status");
+        window.history.pushState({}, "", url);
+      } catch (error) {
+        console.error("Error updating URL:", error);
+      }
+
+      return; // Exit early to avoid the rest of the function
+    }
+
+    // Normal behavior for other status changes
     const newFilters = { ...filters, status: value };
     setFilters(newFilters);
     updateActiveFilters("status", value);
-    onFilterChange(newFilters); // Always pass filters, even for default "Pending"
+    onFilterChange(newFilters);
 
     // When switching to Completed view, ensure we load all completed tasks from database
     if (value === "Completed") {
@@ -195,8 +231,26 @@ const FilterBar = ({
       const newFilters = { ...filters, status: "Pending" };
       setFilters(newFilters);
 
-      // Force the filter change with Pending status
-      onFilterChange(newFilters);
+      // Force reload tasks with Pending status if we were showing Completed
+      if (value === "Completed") {
+        // Create a reset filter object with force flag
+        const resetFilters = {
+          category: filters.category, // Keep category filter
+          status: "Pending",
+          dateRange: filters.dateRange, // Keep date filter if any
+          searchTerm: filters.searchTerm, // Keep search term if any
+          forceReset: true, // Add flag to force reset
+        };
+
+        // Use setTimeout to ensure state updates before filter change
+        setTimeout(() => {
+          // Force a complete reload with pending tasks
+          onFilterChange(resetFilters);
+        }, 0);
+      } else {
+        // For other status changes, just update normally
+        onFilterChange(newFilters);
+      }
 
       // Update URL to remove status parameter
       try {
@@ -205,13 +259,6 @@ const FilterBar = ({
         window.history.pushState({}, "", url);
       } catch (error) {
         console.error("Error updating URL:", error);
-      }
-
-      // Force reload tasks with Pending status if we were showing Completed
-      if (value === "Completed") {
-        setTimeout(() => {
-          onFilterChange({ ...filters, status: "Pending" });
-        }, 0);
       }
     } else if (type === "date") {
       setFilters((prev) => ({ ...prev, dateRange: undefined }));
@@ -293,7 +340,9 @@ const FilterBar = ({
 
         {/* Status filter */}
         <Select value={filters.status} onValueChange={handleStatusChange}>
-          <SelectTrigger className="w-[90px] md:w-[130px] h-7 md:h-8 text-xs md:text-sm">
+          <SelectTrigger
+            className={`w-[90px] md:w-[130px] h-7 md:h-8 text-xs md:text-sm ${filters.status === "Completed" ? "bg-primary/10 border-primary text-primary font-medium" : ""}`}
+          >
             <div className="flex items-center gap-1 md:gap-2">
               <CheckSquare className="h-3 w-3 md:h-4 md:w-4" />
               <SelectValue placeholder="Status" />
@@ -334,9 +383,11 @@ const FilterBar = ({
               | "outline" = "default";
 
             if (type === "category") badgeVariant = "secondary";
-            if (type === "status") badgeVariant = "outline";
             if (type === "date") badgeVariant = "default";
             if (type === "search") badgeVariant = "destructive";
+
+            // Skip showing status badges since the filter button already indicates this
+            if (type === "status") return null;
 
             return (
               <Badge
@@ -346,7 +397,6 @@ const FilterBar = ({
               >
                 <span className="truncate max-w-[100px] md:max-w-none">
                   {type === "category" && "Category:"}
-                  {type === "status" && "Status:"}
                   {type === "date" && "Date:"}
                   {type === "search" && "Search:"} {value}
                 </span>

@@ -28,6 +28,7 @@ export interface Task {
   timerStarted?: number; // timestamp when timer was started
   timeSpent?: number; // time spent in milliseconds
   expectedTime?: number; // expected time to complete in milliseconds
+  phase?: number; // task phase number (for split tasks)
 }
 
 // Settings interface
