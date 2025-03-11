@@ -14,6 +14,7 @@ import DailySummary from "./planner/DailySummary";
 import { Button } from "./ui/button";
 import { Plus, BarChart2, Calendar, List } from "lucide-react";
 import { Dialog, DialogContent, DialogTrigger } from "./ui/dialog";
+import { ActiveTimerBanner } from "./ui/active-timer-banner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -94,6 +95,7 @@ const Home = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
   const [showSummaryOnLogin, setShowSummaryOnLogin] = useState(true);
+  const [activeTimerTask, setActiveTimerTask] = useState<Task | null>(null);
   const [userSettings, setUserSettings] = useState({
     darkMode: false,
     defaultView: "card",
@@ -602,19 +604,27 @@ const Home = () => {
       if (task.id === taskId) {
         if (isRunning) {
           // Start the timer
-          return {
+          const updatedTask = {
             ...task,
             timerStarted: now,
             timeSpent: task.timeSpent || 0,
           };
+          // Set this task as the active timer task
+          setActiveTimerTask(updatedTask);
+          return updatedTask;
         } else {
           // Stop the timer and calculate elapsed time
           const elapsed = task.timerStarted ? now - task.timerStarted : 0;
-          return {
+          const updatedTask = {
             ...task,
             timerStarted: undefined,
             timeSpent: (task.timeSpent || 0) + elapsed,
           };
+          // Clear the active timer task if it's this task
+          if (activeTimerTask?.id === taskId) {
+            setActiveTimerTask(null);
+          }
+          return updatedTask;
         }
       }
       return task;
@@ -622,6 +632,14 @@ const Home = () => {
 
     setTasks(updatedTasks);
     saveTasksToLocalStorage(updatedTasks);
+  };
+
+  // Handle closing the timer banner
+  const handleCloseTimerBanner = () => {
+    if (activeTimerTask) {
+      // Stop the timer when closing the banner
+      handleTimerToggle(activeTimerTask.id, false);
+    }
   };
 
   // Helper function to save tasks to localStorage
@@ -1542,6 +1560,20 @@ const Home = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Active Timer Banner */}
+      {activeTimerTask && (
+        <ActiveTimerBanner
+          taskId={activeTimerTask.id}
+          taskTitle={activeTimerTask.title}
+          expectedTime={activeTimerTask.expectedTime || 3600000}
+          timeSpent={activeTimerTask.timeSpent || 0}
+          timerStarted={activeTimerTask.timerStarted}
+          onPause={() => handleTimerToggle(activeTimerTask.id, false)}
+          onResume={() => handleTimerToggle(activeTimerTask.id, true)}
+          onClose={handleCloseTimerBanner}
+        />
+      )}
     </div>
   );
 };

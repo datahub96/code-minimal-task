@@ -122,11 +122,11 @@ const DailySummary: React.FC<DailySummaryProps> = ({
     <Card className="w-full max-w-md mx-auto bg-white dark:bg-gray-800 shadow-lg rounded-lg overflow-hidden">
       <CardHeader className="border-b border-gray-200 dark:border-gray-700 p-4">
         <div className="flex justify-between items-center">
-          <CardTitle className="text-lg font-semibold flex items-center">
-            <Calendar className="mr-2 h-5 w-5 text-primary" />
+          <CardTitle className="text-sm md:text-base font-semibold flex items-center">
+            <Calendar className="mr-2 h-4 w-4 md:h-5 md:w-5 text-primary" />
             Today's Summary
           </CardTitle>
-          <div className="text-sm text-muted-foreground">
+          <div className="text-xs md:text-sm text-muted-foreground">
             {format(new Date(), "EEEE, MMMM d")}
           </div>
         </div>
@@ -141,34 +141,34 @@ const DailySummary: React.FC<DailySummaryProps> = ({
           <>
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
-                <div className="text-sm text-blue-600 dark:text-blue-400 font-medium mb-1 flex items-center">
-                  <Clock className="mr-1 h-4 w-4" />
+                <div className="text-xs md:text-sm text-blue-600 dark:text-blue-400 font-medium mb-1 flex items-center">
+                  <Clock className="mr-1 h-3 w-3 md:h-4 md:w-4" />
                   Expected Time
                 </div>
-                <div className="text-xl font-bold text-blue-700 dark:text-blue-300">
+                <div className="text-base md:text-lg font-bold text-blue-700 dark:text-blue-300">
                   {formatTimeSpent(totalExpectedTime)}
                 </div>
               </div>
 
               <div className="bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg">
-                <div className="text-sm text-amber-600 dark:text-amber-400 font-medium mb-1 flex items-center">
-                  <Clock className="mr-1 h-4 w-4" />
+                <div className="text-xs md:text-sm text-amber-600 dark:text-amber-400 font-medium mb-1 flex items-center">
+                  <Clock className="mr-1 h-3 w-3 md:h-4 md:w-4" />
                   Remaining Time
                 </div>
-                <div className="text-xl font-bold text-amber-700 dark:text-amber-300">
+                <div className="text-base md:text-lg font-bold text-amber-700 dark:text-amber-300">
                   {formatTimeSpent(totalRemainingTime)}
                 </div>
               </div>
             </div>
 
             <div className="mb-4">
-              <h3 className="text-sm font-medium mb-2 flex items-center">
-                <AlertTriangle className="mr-1 h-4 w-4 text-amber-500" />
+              <h3 className="text-xs md:text-sm font-medium mb-2 flex items-center">
+                <AlertTriangle className="mr-1 h-3 w-3 md:h-4 md:w-4 text-amber-500" />
                 Tasks Due Today ({todaysTasks.length})
               </h3>
 
               {todaysTasks.length === 0 ? (
-                <div className="text-center py-6 text-sm text-muted-foreground bg-gray-50 dark:bg-gray-800 rounded-md">
+                <div className="text-center py-6 text-xs md:text-sm text-muted-foreground bg-gray-50 dark:bg-gray-800 rounded-md">
                   No tasks due today
                 </div>
               ) : (
@@ -182,11 +182,11 @@ const DailySummary: React.FC<DailySummaryProps> = ({
                       >
                         <div className="flex justify-between items-start">
                           <div className="flex-1">
-                            <div className="font-medium text-sm">
+                            <div className="font-medium text-xs md:text-sm">
                               {task.title}
                             </div>
                             {task.description && (
-                              <div className="text-xs text-muted-foreground mt-1 line-clamp-1">
+                              <div className="text-[10px] md:text-xs text-muted-foreground mt-1 line-clamp-1">
                                 {task.description}
                               </div>
                             )}
@@ -207,8 +207,8 @@ const DailySummary: React.FC<DailySummaryProps> = ({
                           )}
                         </div>
 
-                        <div className="flex items-center mt-2 text-xs text-muted-foreground">
-                          <Clock className="mr-1 h-3 w-3" />
+                        <div className="flex items-center mt-2 text-[10px] md:text-xs text-muted-foreground">
+                          <Clock className="mr-1 h-2.5 w-2.5 md:h-3 md:w-3" />
                           <span className="mr-2">
                             {formatTimeSpent(task.expectedTime || 0)}
                           </span>
