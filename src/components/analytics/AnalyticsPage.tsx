@@ -69,8 +69,12 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ userId }) => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [activeTab, setActiveTab] = useState("overview");
   const [timeFrame, setTimeFrame] = useState<
-    "all" | "today" | "week" | "month"
+    "all" | "today" | "week" | "month" | "custom"
   >("today");
+  const [customDateRange, setCustomDateRange] = useState<{
+    from: Date | undefined;
+    to: Date | undefined;
+  }>({ from: undefined, to: undefined });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -194,6 +198,17 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ userId }) => {
       if (timeFrame === "today") return isToday(taskDate);
       if (timeFrame === "week") return isThisWeek(taskDate);
       if (timeFrame === "month") return isThisMonth(taskDate);
+      if (
+        timeFrame === "custom" &&
+        customDateRange.from &&
+        customDateRange.to
+      ) {
+        const from = new Date(customDateRange.from);
+        from.setHours(0, 0, 0, 0);
+        const to = new Date(customDateRange.to);
+        to.setHours(23, 59, 59, 999);
+        return taskDate >= from && taskDate <= to;
+      }
       return true;
     });
   };
@@ -401,15 +416,62 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ userId }) => {
           <select
             className="bg-background border rounded-md px-2 py-1 text-xs md:text-sm max-w-[100px] md:max-w-none"
             value={timeFrame}
-            onChange={(e) =>
-              setTimeFrame(e.target.value as "all" | "today" | "week" | "month")
-            }
+            onChange={(e) => {
+              const value = e.target.value as
+                | "all"
+                | "today"
+                | "week"
+                | "month"
+                | "custom";
+              setTimeFrame(value);
+              if (value !== "custom") {
+                setCustomDateRange({ from: undefined, to: undefined });
+              }
+            }}
           >
             <option value="all">All Time</option>
             <option value="today">Today</option>
             <option value="week">This Week</option>
             <option value="month">This Month</option>
+            <option value="custom">Custom Date</option>
           </select>
+
+          {timeFrame === "custom" && (
+            <div className="flex items-center space-x-2">
+              <input
+                type="date"
+                className="bg-background border rounded-md px-2 py-1 text-xs md:text-sm"
+                value={
+                  customDateRange.from
+                    ? format(customDateRange.from, "yyyy-MM-dd")
+                    : ""
+                }
+                onChange={(e) => {
+                  const date = e.target.value
+                    ? new Date(e.target.value)
+                    : undefined;
+                  setCustomDateRange((prev) => ({ ...prev, from: date }));
+                }}
+              />
+              <span className="text-xs">to</span>
+              <input
+                type="date"
+                className="bg-background border rounded-md px-2 py-1 text-xs md:text-sm"
+                value={
+                  customDateRange.to
+                    ? format(customDateRange.to, "yyyy-MM-dd")
+                    : ""
+                }
+                onChange={(e) => {
+                  const date = e.target.value
+                    ? new Date(e.target.value)
+                    : undefined;
+                  setCustomDateRange((prev) => ({ ...prev, to: date }));
+                }}
+              />
+            </div>
+          )}
+
           <Button
             variant="outline"
             size="sm"
@@ -425,7 +487,7 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ userId }) => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid grid-cols-3 mb-4 overflow-x-auto">
+        <TabsList className="grid grid-cols-4 mb-4 overflow-x-auto">
           <TabsTrigger
             value="overview"
             className="text-xs md:text-sm px-2 md:px-4"
@@ -440,6 +502,12 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ userId }) => {
             className="text-xs md:text-sm px-2 md:px-4"
           >
             Categories
+          </TabsTrigger>
+          <TabsTrigger
+            value="taskGroups"
+            className="text-xs md:text-sm px-2 md:px-4"
+          >
+            Task Groups
           </TabsTrigger>
         </TabsList>
 
@@ -515,15 +583,15 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ userId }) => {
             <Card className="col-span-1">
               <CardHeader>
                 <CardTitle className="text-lg font-semibold flex items-center">
-                  <PieChartIcon className="mr-2 h-5 w-5" /> Tasks by Category
+                  <PieChartIcon className="mr-2 h-5 w-5" /> Hours by Category
                 </CardTitle>
               </CardHeader>
               <CardContent className="h-[300px]">
-                {tasksByCategoryData.length > 0 ? (
+                {timeByCategoryData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
-                        data={tasksByCategoryData}
+                        data={timeByCategoryData}
                         cx="50%"
                         cy="50%"
                         labelLine={false}
@@ -537,12 +605,15 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ userId }) => {
                           `${name}: ${(percent * 100).toFixed(0)}%`
                         }
                       >
-                        {tasksByCategoryData.map((entry, index) => (
+                        {timeByCategoryData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
                       <Tooltip
-                        formatter={(value) => [`${value} tasks`, "Count"]}
+                        formatter={(value) => [
+                          formatTimeSpent(value as number),
+                          "Hours Spent",
+                        ]}
                       />
                       <Legend />
                     </PieChart>
@@ -558,29 +629,113 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ userId }) => {
             <Card className="col-span-1">
               <CardHeader>
                 <CardTitle className="text-lg font-semibold flex items-center">
-                  <BarChart2 className="mr-2 h-5 w-5" /> Tasks by Day of Week
+                  <BarChart2 className="mr-2 h-5 w-5" /> Hours by Day of Week
                 </CardTitle>
               </CardHeader>
               <CardContent className="h-[300px]">
-                {tasksByDayOfWeekData.some((day) => day.tasks > 0) ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={tasksByDayOfWeekData}>
-                      <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                      <YAxis />
-                      <Tooltip />
-                      <Bar
-                        dataKey="tasks"
-                        fill="#3b82f6"
-                        name="Tasks"
-                        radius={[4, 4, 0, 0]}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-full">
-                    <p className="text-muted-foreground">No data available</p>
-                  </div>
-                )}
+                {(() => {
+                  // Calculate hours by day of week and category
+                  const hoursByDayOfWeekAndCategory: Record<
+                    string,
+                    Record<string, number>
+                  > = {};
+                  const categoryColors: Record<string, string> = {};
+
+                  // Initialize days of the week
+                  const daysOfWeek = [
+                    "Monday",
+                    "Tuesday",
+                    "Wednesday",
+                    "Thursday",
+                    "Friday",
+                    "Saturday",
+                    "Sunday",
+                  ];
+
+                  daysOfWeek.forEach((day) => {
+                    hoursByDayOfWeekAndCategory[day] = {};
+                  });
+
+                  // Collect data by day and category
+                  filteredTasks.forEach((task) => {
+                    if (!task.timeSpent) return;
+
+                    const date =
+                      task.deadline ||
+                      (task.createdAt ? new Date(task.createdAt) : new Date());
+                    const dayOfWeek = format(date, "EEEE");
+                    const categoryName = task.category?.name || "Uncategorized";
+
+                    // Store category color
+                    if (!categoryColors[categoryName] && task.category?.color) {
+                      categoryColors[categoryName] = task.category.color;
+                    } else if (!categoryColors[categoryName]) {
+                      // Assign a color from the COLORS array if not already assigned
+                      const existingCategories =
+                        Object.keys(categoryColors).length;
+                      categoryColors[categoryName] =
+                        COLORS[existingCategories % COLORS.length];
+                    }
+
+                    // Add hours to the appropriate day and category
+                    if (!hoursByDayOfWeekAndCategory[dayOfWeek][categoryName]) {
+                      hoursByDayOfWeekAndCategory[dayOfWeek][categoryName] = 0;
+                    }
+                    hoursByDayOfWeekAndCategory[dayOfWeek][categoryName] +=
+                      task.timeSpent;
+                  });
+
+                  // Format data for the stacked bar chart
+                  const stackedData = daysOfWeek.map((day) => {
+                    const dayData: Record<string, any> = { name: day };
+                    Object.keys(categoryColors).forEach((category) => {
+                      dayData[category] =
+                        hoursByDayOfWeekAndCategory[day][category] || 0;
+                    });
+                    return dayData;
+                  });
+
+                  // Check if we have any data to display
+                  const hasData = stackedData.some((day) =>
+                    Object.keys(day).some(
+                      (key) => key !== "name" && day[key] > 0,
+                    ),
+                  );
+
+                  return hasData ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={stackedData}>
+                        <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                        <YAxis
+                          tickFormatter={(value) =>
+                            `${Math.floor(value / (1000 * 60 * 60))}h`
+                          }
+                        />
+                        <Tooltip
+                          formatter={(value, name) => [
+                            formatTimeSpent(value as number),
+                            name as string,
+                          ]}
+                        />
+                        <Legend />
+                        {Object.keys(categoryColors).map((category) => (
+                          <Bar
+                            key={category}
+                            dataKey={category}
+                            stackId="a"
+                            name={category}
+                            fill={categoryColors[category]}
+                            radius={[4, 4, 0, 0]}
+                          />
+                        ))}
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <p className="text-muted-foreground">No data available</p>
+                    </div>
+                  );
+                })()}
               </CardContent>
             </Card>
           </div>
@@ -726,6 +881,339 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ userId }) => {
                   </div>
                 )}
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="taskGroups" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold flex items-center">
+                <Activity className="mr-2 h-5 w-5" /> Hours by Task Group
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="h-[400px]">
+              {(() => {
+                // Group tasks by their base name (removing phase information)
+                const taskGroups: Record<
+                  string,
+                  {
+                    totalTime: number;
+                    tasks: Task[];
+                    phases: number;
+                    completed: number;
+                    color?: string;
+                  }
+                > = {};
+
+                // Process all tasks to identify groups
+                filteredTasks.forEach((task) => {
+                  // Extract base name by removing phase information
+                  let baseName = task.title;
+                  const phaseMatch = task.title.match(
+                    /\s*\(Phase \d+( - Completed)?\)\s*/g,
+                  );
+
+                  if (phaseMatch) {
+                    // Remove all phase information from the title
+                    phaseMatch.forEach((match) => {
+                      baseName = baseName.replace(match, "");
+                    });
+
+                    // Trim any extra whitespace
+                    baseName = baseName.trim();
+                  }
+
+                  // Initialize group if it doesn't exist
+                  if (!taskGroups[baseName]) {
+                    taskGroups[baseName] = {
+                      totalTime: 0,
+                      tasks: [],
+                      phases: 0,
+                      completed: 0,
+                      color:
+                        task.category?.color ||
+                        COLORS[Object.keys(taskGroups).length % COLORS.length],
+                    };
+                  }
+
+                  // Add task to group
+                  taskGroups[baseName].tasks.push(task);
+                  taskGroups[baseName].totalTime += task.timeSpent || 0;
+                  taskGroups[baseName].phases += 1;
+                  if (task.completed) {
+                    taskGroups[baseName].completed += 1;
+                  }
+                });
+
+                // Convert to array for chart
+                const taskGroupsArray = Object.entries(taskGroups)
+                  .filter(([_, group]) => group.totalTime > 0) // Only include groups with time spent
+                  .map(([name, group]) => ({
+                    name:
+                      name.length > 25 ? name.substring(0, 22) + "..." : name,
+                    fullName: name,
+                    hours: group.totalTime,
+                    phases: group.phases,
+                    completed: group.completed,
+                    color: group.color,
+                  }))
+                  .sort((a, b) => b.hours - a.hours); // Sort by time spent
+
+                return taskGroupsArray.length > 0 ? (
+                  <div className="h-full flex flex-col">
+                    <ResponsiveContainer width="100%" height="70%">
+                      <BarChart
+                        data={taskGroupsArray}
+                        layout="vertical"
+                        margin={{ left: 20, right: 20 }}
+                      >
+                        <XAxis
+                          type="number"
+                          tickFormatter={(value) =>
+                            `${Math.floor(value / (1000 * 60 * 60))}h`
+                          }
+                        />
+                        <YAxis
+                          type="category"
+                          dataKey="name"
+                          width={150}
+                          tick={{ fontSize: 12 }}
+                        />
+                        <Tooltip
+                          formatter={(value, name, props) => [
+                            formatTimeSpent(value as number),
+                            "Hours Spent",
+                          ]}
+                          labelFormatter={(label) => {
+                            const item = taskGroupsArray.find(
+                              (item) => item.name === label,
+                            );
+                            return item?.fullName || label;
+                          }}
+                        />
+                        <Bar dataKey="hours" name="Hours Spent">
+                          {taskGroupsArray.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+
+                    <div className="mt-4 overflow-auto max-h-[30%]">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left py-2 px-2">Task Group</th>
+                            <th className="text-right py-2 px-2">Hours</th>
+                            <th className="text-right py-2 px-2">Phases</th>
+                            <th className="text-right py-2 px-2">Completed</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {taskGroupsArray.map((group, index) => (
+                            <tr
+                              key={index}
+                              className="border-b border-muted hover:bg-muted/50"
+                            >
+                              <td className="py-2 px-2 flex items-center">
+                                <div
+                                  className="w-3 h-3 rounded-full mr-2"
+                                  style={{ backgroundColor: group.color }}
+                                />
+                                <span
+                                  className="truncate max-w-[200px]"
+                                  title={group.fullName}
+                                >
+                                  {group.fullName}
+                                </span>
+                              </td>
+                              <td className="text-right py-2 px-2">
+                                {formatTimeSpent(group.hours)}
+                              </td>
+                              <td className="text-right py-2 px-2">
+                                {group.phases}
+                              </td>
+                              <td className="text-right py-2 px-2">
+                                {group.completed}/{group.phases}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-full">
+                    <p className="text-muted-foreground">
+                      No task group data available
+                    </p>
+                  </div>
+                );
+              })()}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold flex items-center">
+                <CheckCircle className="mr-2 h-5 w-5" /> Task Group Completion
+                Analysis
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {(() => {
+                // Group tasks by their base name (removing phase information)
+                const taskGroups: Record<
+                  string,
+                  {
+                    totalTime: number;
+                    tasks: Task[];
+                    phases: number;
+                    completed: number;
+                    color?: string;
+                    averageTimePerPhase: number;
+                  }
+                > = {};
+
+                // Process all tasks to identify groups
+                filteredTasks.forEach((task) => {
+                  // Extract base name by removing phase information
+                  let baseName = task.title;
+                  const phaseMatch = task.title.match(
+                    /\s*\(Phase \d+( - Completed)?\)\s*/g,
+                  );
+
+                  if (phaseMatch) {
+                    // Remove all phase information from the title
+                    phaseMatch.forEach((match) => {
+                      baseName = baseName.replace(match, "");
+                    });
+
+                    // Trim any extra whitespace
+                    baseName = baseName.trim();
+                  }
+
+                  // Initialize group if it doesn't exist
+                  if (!taskGroups[baseName]) {
+                    taskGroups[baseName] = {
+                      totalTime: 0,
+                      tasks: [],
+                      phases: 0,
+                      completed: 0,
+                      color:
+                        task.category?.color ||
+                        COLORS[Object.keys(taskGroups).length % COLORS.length],
+                      averageTimePerPhase: 0,
+                    };
+                  }
+
+                  // Add task to group
+                  taskGroups[baseName].tasks.push(task);
+                  taskGroups[baseName].totalTime += task.timeSpent || 0;
+                  taskGroups[baseName].phases += 1;
+                  if (task.completed) {
+                    taskGroups[baseName].completed += 1;
+                  }
+                });
+
+                // Calculate average time per phase
+                Object.values(taskGroups).forEach((group) => {
+                  group.averageTimePerPhase =
+                    group.phases > 0 ? group.totalTime / group.phases : 0;
+                });
+
+                // Convert to array for display
+                const taskGroupsArray = Object.entries(taskGroups)
+                  .filter(([_, group]) => group.phases > 1) // Only include groups with multiple phases
+                  .map(([name, group]) => ({
+                    name,
+                    totalTime: group.totalTime,
+                    phases: group.phases,
+                    completed: group.completed,
+                    averageTimePerPhase: group.averageTimePerPhase,
+                    color: group.color,
+                    completionRate:
+                      group.phases > 0
+                        ? (group.completed / group.phases) * 100
+                        : 0,
+                  }))
+                  .sort((a, b) => b.totalTime - a.totalTime) // Sort by time spent
+                  .slice(0, 6); // Show top 6 groups
+
+                return taskGroupsArray.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {taskGroupsArray.map((group, index) => (
+                      <Card key={index} className="bg-muted/50">
+                        <CardContent className="p-4">
+                          <div className="flex items-center mb-2">
+                            <div
+                              className="w-3 h-3 rounded-full mr-2"
+                              style={{ backgroundColor: group.color }}
+                            />
+                            <h3
+                              className="font-medium truncate"
+                              title={group.name}
+                            >
+                              {group.name}
+                            </h3>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div>
+                              <p className="text-xs text-muted-foreground">
+                                Total Time
+                              </p>
+                              <p className="font-medium">
+                                {formatTimeSpent(group.totalTime)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">
+                                Phases
+                              </p>
+                              <p className="font-medium">{group.phases}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">
+                                Avg Time/Phase
+                              </p>
+                              <p className="font-medium">
+                                {formatTimeSpent(group.averageTimePerPhase)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">
+                                Completion
+                              </p>
+                              <p className="font-medium">
+                                {group.completed}/{group.phases}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="mt-2">
+                            <div className="flex justify-between text-xs">
+                              <span>Completion Rate</span>
+                              <span>{group.completionRate.toFixed(0)}%</span>
+                            </div>
+                            <Progress
+                              value={group.completionRate}
+                              className="h-1 mt-1"
+                            />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center py-8">
+                    <p className="text-muted-foreground">
+                      No multi-phase task groups found
+                    </p>
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
         </TabsContent>

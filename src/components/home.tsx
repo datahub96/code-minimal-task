@@ -1,10 +1,11 @@
 import { Suspense } from "react";
 import { useState, useEffect } from "react";
-import { isSameDay } from "date-fns";
+import { isSameDay, isAfter, isBefore } from "date-fns";
 import { StorageManager } from "@/components/storage/StorageManager";
 import { supabase } from "@/lib/supabase";
 import Header from "./layout/Header";
 import TaskList from "./tasks/TaskList";
+import CompletedTasksView from "./tasks/CompletedTasksView";
 import CalendarView from "./tasks/CalendarView";
 import FilterBar from "./filters/FilterBar";
 import TaskForm from "./tasks/TaskForm";
@@ -140,6 +141,43 @@ const Home = () => {
       }
     };
 
+    // Check for any running timers that need to be updated
+    const checkRunningTimers = (loadedTasks) => {
+      const now = Date.now();
+      let hasRunningTimer = false;
+      const updatedTasks = loadedTasks.map((task) => {
+        if (task.timerStarted) {
+          // Calculate elapsed time since last update
+          const lastUpdate = task.lastTimerUpdate || task.timerStarted;
+          const elapsed = now - lastUpdate;
+
+          // Update the timeSpent and lastTimerUpdate
+          hasRunningTimer = true;
+          const updatedTask = {
+            ...task,
+            timeSpent: (task.timeSpent || 0) + elapsed,
+            lastTimerUpdate: now,
+            // Keep timer running
+            timerStarted: now,
+          };
+
+          // Also set this as the active timer task
+          setActiveTimerTask(updatedTask);
+
+          return updatedTask;
+        }
+        return task;
+      });
+
+      if (hasRunningTimer) {
+        // Save the updated tasks with the accumulated time
+        saveTasksToLocalStorage(updatedTasks);
+        return updatedTasks;
+      }
+
+      return loadedTasks;
+    };
+
     forceReloadAllTasks();
 
     // Import database functions
@@ -191,13 +229,16 @@ const Home = () => {
             // Load tasks with appropriate filter
             const tasks = await getTasks(user.id, { status: filterStatus });
             if (tasks && tasks.length > 0) {
-              setTasks(tasks);
+              // Check for running timers and update them
+              const updatedTasks = checkRunningTimers(tasks);
+
+              setTasks(updatedTasks);
               console.log(
-                `Loaded ${tasks.length} ${filterStatus.toLowerCase()} tasks from database`,
+                `Loaded ${updatedTasks.length} ${filterStatus.toLowerCase()} tasks from database`,
               );
 
               // Save to localStorage as backup
-              StorageManager.setJSON("taskManagerTasks", tasks);
+              StorageManager.setJSON("taskManagerTasks", updatedTasks);
 
               // Also update filters state to match URL
               if (urlStatus === "Completed") {
@@ -278,10 +319,13 @@ const Home = () => {
             deadline: task.deadline ? new Date(task.deadline) : undefined,
           }));
 
+          // Check for running timers and update them
+          const updatedTasks = checkRunningTimers(tasksWithDates);
+
           // Apply filter based on status
           let filteredTasks;
           if (filterStatus === "Completed") {
-            filteredTasks = tasksWithDates.filter((task) => task.completed);
+            filteredTasks = updatedTasks.filter((task) => task.completed);
             console.log(
               `Loaded ${filteredTasks.length} completed tasks from localStorage`,
             );
@@ -289,7 +333,7 @@ const Home = () => {
             // Update filters state
             setFilters({ status: "Completed" });
           } else {
-            filteredTasks = tasksWithDates.filter((task) => !task.completed);
+            filteredTasks = updatedTasks.filter((task) => !task.completed);
             console.log(
               `Loaded ${filteredTasks.length} pending tasks from localStorage`,
             );
@@ -608,6 +652,7 @@ const Home = () => {
             ...task,
             timerStarted: now,
             timeSpent: task.timeSpent || 0,
+            lastTimerUpdate: now, // Store the last update time
           };
           // Set this task as the active timer task
           setActiveTimerTask(updatedTask);
@@ -619,6 +664,7 @@ const Home = () => {
             ...task,
             timerStarted: undefined,
             timeSpent: (task.timeSpent || 0) + elapsed,
+            lastTimerUpdate: now, // Update the last update time
           };
           // Clear the active timer task if it's this task
           if (activeTimerTask?.id === taskId) {
@@ -641,6 +687,51 @@ const Home = () => {
       handleTimerToggle(activeTimerTask.id, false);
     }
   };
+
+  // Add event listener for page unload to save timer state
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // If there's an active timer, save the current elapsed time
+      if (activeTimerTask && activeTimerTask.timerStarted) {
+        const now = Date.now();
+        const elapsed = now - activeTimerTask.timerStarted;
+        const updatedTask = {
+          ...activeTimerTask,
+          timeSpent: (activeTimerTask.timeSpent || 0) + elapsed,
+          lastTimerUpdate: now,
+          // Keep the timer running for when the app is reopened
+          timerStarted: now,
+        };
+
+        // Update the task in the full task list
+        const updatedTasks = tasks.map((task) =>
+          task.id === activeTimerTask.id ? updatedTask : task,
+        );
+
+        // Save to localStorage synchronously
+        try {
+          localStorage.setItem(
+            "taskManagerTasks",
+            JSON.stringify(updatedTasks),
+          );
+          if (currentUser?.id) {
+            localStorage.setItem(
+              `taskManagerTasks_${currentUser.id}`,
+              JSON.stringify(updatedTasks),
+            );
+          }
+        } catch (error) {
+          console.error("Error saving timer state before unload:", error);
+        }
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [activeTimerTask, tasks, currentUser]);
 
   // Helper function to save tasks to localStorage
   const saveTasksToLocalStorage = (tasksToSave: Task[]) => {
@@ -961,6 +1052,17 @@ const Home = () => {
       newFilters.status = "Pending";
     }
 
+    // Handle date range filtering for completed tasks
+    if (
+      newFilters.dateRange &&
+      typeof newFilters.dateRange === "object" &&
+      newFilters.dateRange.filterType &&
+      newFilters.status === "Completed"
+    ) {
+      // Store the date range filter separately to apply it later
+      newFilters.completedTasksDateRange = newFilters.dateRange;
+    }
+
     setFilters(newFilters);
 
     try {
@@ -1163,10 +1265,43 @@ const Home = () => {
 
       // Filter by date
       if (newFilters.dateRange) {
+        // Regular date filter for task deadlines
         filteredTasks = filteredTasks.filter(
           (task) =>
             task.deadline && isSameDay(task.deadline, newFilters.dateRange),
         );
+      }
+
+      // Special date range filter for completed tasks
+      if (
+        newFilters.completedTasksDateRange &&
+        newFilters.status === "Completed"
+      ) {
+        const { startDate, endDate } = newFilters.completedTasksDateRange;
+
+        if (startDate && endDate) {
+          filteredTasks = filteredTasks.filter((task) => {
+            // Use completedAt date for completed tasks if available
+            const taskDate = task.completedAt
+              ? new Date(task.completedAt)
+              : task.deadline || new Date();
+
+            // Check if the task date is within the range (inclusive)
+            return (
+              (isSameDay(taskDate, startDate) ||
+                isAfter(taskDate, startDate)) &&
+              (isSameDay(taskDate, endDate) || isBefore(taskDate, endDate))
+            );
+          });
+        } else if (startDate) {
+          // If only start date is provided, filter for that specific day
+          filteredTasks = filteredTasks.filter((task) => {
+            const taskDate = task.completedAt
+              ? new Date(task.completedAt)
+              : task.deadline || new Date();
+            return isSameDay(taskDate, startDate);
+          });
+        }
       }
 
       // Filter by search term
@@ -1478,27 +1613,51 @@ const Home = () => {
             {currentView === "analytics" ? (
               <AnalyticsPage userId={currentUser?.id} />
             ) : currentView === "list" ? (
-              <TaskList
-                tasks={tasks}
-                onTaskComplete={handleTaskComplete}
-                onTaskEdit={handleTaskEdit}
-                onTaskDelete={handleTaskDelete}
-                onTaskReorder={handleTaskReorder}
-                onTimerToggle={handleTimerToggle}
-                onSplitTask={handleSplitTask}
-                viewMode="list"
-              />
+              showCompleted ? (
+                <CompletedTasksView
+                  tasks={tasks}
+                  onTaskComplete={handleTaskComplete}
+                  onTaskEdit={handleTaskEdit}
+                  onTaskDelete={handleTaskDelete}
+                  onTaskReorder={handleTaskReorder}
+                  onTimerToggle={handleTimerToggle}
+                  onSplitTask={handleSplitTask}
+                />
+              ) : (
+                <TaskList
+                  tasks={tasks}
+                  onTaskComplete={handleTaskComplete}
+                  onTaskEdit={handleTaskEdit}
+                  onTaskDelete={handleTaskDelete}
+                  onTaskReorder={handleTaskReorder}
+                  onTimerToggle={handleTimerToggle}
+                  onSplitTask={handleSplitTask}
+                  viewMode="list"
+                />
+              )
             ) : currentView === "card" ? (
-              <TaskList
-                tasks={tasks}
-                onTaskComplete={handleTaskComplete}
-                onTaskEdit={handleTaskEdit}
-                onTaskDelete={handleTaskDelete}
-                onTaskReorder={handleTaskReorder}
-                onTimerToggle={handleTimerToggle}
-                onSplitTask={handleSplitTask}
-                viewMode="card"
-              />
+              showCompleted ? (
+                <CompletedTasksView
+                  tasks={tasks}
+                  onTaskComplete={handleTaskComplete}
+                  onTaskEdit={handleTaskEdit}
+                  onTaskDelete={handleTaskDelete}
+                  onTaskReorder={handleTaskReorder}
+                  onTimerToggle={handleTimerToggle}
+                  onSplitTask={handleSplitTask}
+                />
+              ) : (
+                <TaskList
+                  tasks={tasks}
+                  onTaskComplete={handleTaskComplete}
+                  onTaskEdit={handleTaskEdit}
+                  onTaskDelete={handleTaskDelete}
+                  onTaskReorder={handleTaskReorder}
+                  onTimerToggle={handleTimerToggle}
+                  onSplitTask={handleSplitTask}
+                  viewMode="card"
+                />
+              )
             ) : (
               <CalendarView
                 tasks={tasks.map((task) => ({

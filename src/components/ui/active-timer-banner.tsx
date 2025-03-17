@@ -55,11 +55,19 @@ const ActiveTimerBanner = ({
     let interval: number;
 
     if (timerStarted) {
+      // Initialize with the current elapsed time
+      const initialNow = Date.now();
+      const initialElapsed = initialNow - timerStarted;
+      setCurrentTimeSpent(timeSpent + initialElapsed);
+
       interval = window.setInterval(() => {
         const now = Date.now();
         const elapsed = now - timerStarted;
         setCurrentTimeSpent(timeSpent + elapsed);
       }, 1000);
+    } else {
+      // If timer is not running, just show the accumulated time
+      setCurrentTimeSpent(timeSpent);
     }
 
     return () => clearInterval(interval);
