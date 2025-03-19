@@ -22,6 +22,7 @@ import {
   CheckSquare,
   Send,
   AlertTriangle,
+  Calculator,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -63,6 +64,65 @@ const Header = ({
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [isErrorLogOpen, setIsErrorLogOpen] = useState(false);
   const [feedbackText, setFeedbackText] = useState("");
+
+  const handleFactorialClick = () => {
+    const newWindow = window.open("", "_blank");
+    if (newWindow) {
+      newWindow.document.write(
+        "<html><head><title>Factorial Result</title></head><body><div>Loading result...</div></body></html>",
+      );
+
+      fetch("http://localhost:3000/execute")
+        .then((response) => response.text())
+        .then((result) => {
+          if (newWindow && !newWindow.closed) {
+            newWindow.document.open();
+            newWindow.document.write(`
+              <html>
+                <head>
+                  <title>Factorial Result</title>
+                  <style>
+                    body { font-family: Arial, sans-serif; padding: 20px; line-height: 1.6; }
+                    h1 { color: #333; }
+                    .result { margin-top: 20px; padding: 15px; background-color: #f5f5f5; border-radius: 5px; }
+                  </style>
+                </head>
+                <body>
+                  <h1>Factorial Calculation Result</h1>
+                  <div class="result">${result}</div>
+                </body>
+              </html>
+            `);
+            newWindow.document.close();
+          }
+        })
+        .catch((error) => {
+          console.error("Error executing factorial:", error);
+          if (newWindow && !newWindow.closed) {
+            newWindow.document.open();
+            newWindow.document.write(`
+              <html>
+                <head>
+                  <title>Factorial Error</title>
+                  <style>
+                    body { font-family: Arial, sans-serif; padding: 20px; line-height: 1.6; }
+                    h1 { color: #333; }
+                    .error { margin-top: 20px; padding: 15px; background-color: #ffebee; color: #c62828; border-radius: 5px; }
+                  </style>
+                </head>
+                <body>
+                  <h1>Error Calculating Factorial</h1>
+                  <div class="error">An error occurred: ${error.message}</div>
+                </body>
+              </html>
+            `);
+            newWindow.document.close();
+          }
+        });
+    } else {
+      alert("Please allow pop-ups for this site to view the factorial result.");
+    }
+  };
   const navigate = useNavigate();
 
   const handleViewChange = (
@@ -180,6 +240,25 @@ const Header = ({
               </TooltipTrigger>
               <TooltipContent>
                 <p>Today's Summary</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          {/* Factorial Button */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleFactorialClick}
+                  className="h-10 w-10 p-0"
+                >
+                  <Calculator className="h-5 w-5 md:h-6 md:w-6" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Factorial</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
