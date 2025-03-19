@@ -518,8 +518,26 @@ const TaskList = ({
     tasks.every((task) => task.completed) ||
     (tasks.length > 0 && tasks.every((task) => task.completed));
 
+  // Sort tasks by deadline (tasks without deadlines will appear at the end)
+  const sortedTasks = [...tasks].sort((a, b) => {
+    // If both tasks have deadlines, compare them
+    if (a.deadline && b.deadline) {
+      return a.deadline.getTime() - b.deadline.getTime();
+    }
+    // If only task a has a deadline, it should come first
+    if (a.deadline && !b.deadline) {
+      return -1;
+    }
+    // If only task b has a deadline, it should come first
+    if (!a.deadline && b.deadline) {
+      return 1;
+    }
+    // If neither has a deadline, maintain original order
+    return 0;
+  });
+
   // Always show all tasks, regardless of completion status
-  const visibleTasks = tasks;
+  const visibleTasks = sortedTasks;
 
   const handleDragStart = (index: number) => {
     setDraggedItemIndex(index);

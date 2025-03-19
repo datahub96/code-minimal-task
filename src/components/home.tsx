@@ -131,6 +131,23 @@ const Home = () => {
 
   // Load user settings and tasks when component mounts
   useEffect(() => {
+    // Apply any saved settings immediately on mount
+    const applyInitialSettings = () => {
+      try {
+        const savedSettings = localStorage.getItem("taskManagerSettings");
+        if (savedSettings) {
+          const parsedSettings = JSON.parse(savedSettings);
+          // Apply default view immediately
+          if (parsedSettings.defaultView) {
+            setCurrentView(parsedSettings.defaultView);
+          }
+        }
+      } catch (error) {
+        console.error("Error applying initial settings:", error);
+      }
+    };
+
+    applyInitialSettings();
     // Force reload all tasks on initial load
     const forceReloadAllTasks = () => {
       try {
@@ -1339,6 +1356,13 @@ const Home = () => {
     // Save settings to localStorage for current session using StorageManager
     StorageManager.setJSON("taskManagerSettings", newSettings);
 
+    // Also save directly to localStorage to ensure it's available immediately
+    try {
+      localStorage.setItem("taskManagerSettings", JSON.stringify(newSettings));
+    } catch (error) {
+      console.error("Error saving settings to localStorage:", error);
+    }
+
     // Save settings to user-specific storage if user is logged in
     if (currentUser?.id) {
       StorageManager.setJSON(
@@ -1357,11 +1381,15 @@ const Home = () => {
       }
     }
 
-    // Apply default view setting
-    if (newSettings.defaultView !== currentView) {
-      setCurrentView(
-        newSettings.defaultView as "list" | "calendar" | "card" | "analytics",
-      );
+    // Always apply default view setting immediately
+    if (newSettings.defaultView) {
+      const newView = newSettings.defaultView as
+        | "list"
+        | "calendar"
+        | "card"
+        | "analytics";
+      console.log(`Applying default view setting: ${newView}`);
+      setCurrentView(newView);
     }
 
     // Apply summary setting

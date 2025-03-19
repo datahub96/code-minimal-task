@@ -111,7 +111,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   };
 
   const handleDefaultViewChange = (value: string) => {
+    console.log(`Default view changed to: ${value}`);
     setDefaultView(value);
+    // Immediately save and apply this setting
     saveSettings({ defaultView: value });
   };
 
@@ -141,6 +143,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       // Save settings to localStorage
       localStorage.setItem("taskManagerSettings", JSON.stringify(newSettings));
 
+      // Immediately apply the settings via the callback
       onSettingsChange(newSettings);
     } catch (error) {
       console.error("Error saving settings:", error);
